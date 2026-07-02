@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="game-uuid" content="97d2e964-61e8-41f9-9fe2-bc0ab7b76b14" />
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/gif" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
+    <title>Whisper Pond</title>
+  </head>
+  <body>
+    <div id="app" class="wp-shell">
+      <canvas id="pond" class="wp-canvas" aria-hidden="true"></canvas>
+      <div class="wp-noise" aria-hidden="true"></div>
+
+      <header class="wp-hud" data-screen="play">
+        <div class="wp-hud__time">
+          <span data-i18n="time">Time</span>
+          <strong id="timeLeft">60</strong>
+        </div>
+        <div class="wp-hud__score">
+          <span data-i18n="echo">Echo</span>
+          <strong id="scoreValue">0</strong>
+        </div>
+      </header>
+
+      <main id="startScreen" class="wp-screen wp-screen--start">
+        <section class="wp-start-card">
+          <div class="wp-kicker" data-i18n="kicker">A pond for one sentence</div>
+          <h1 data-i18n="title">Whisper Pond</h1>
+          <label class="wp-input-wrap">
+            <span data-i18n="prompt">Drop one thought into the water</span>
+            <textarea id="thoughtInput" maxlength="80" rows="2" data-i18n-placeholder="placeholder"></textarea>
+          </label>
+          <button id="startButton" class="wp-button wp-button--primary" type="button" data-i18n="start">Begin</button>
+        </section>
+      </main>
+
+      <main id="gameScreen" class="wp-screen wp-screen--game" aria-live="polite">
+        <div id="comboBadge" class="wp-combo" aria-hidden="true"></div>
+        <div id="hint" class="wp-hint" data-i18n="hint">Tap the water</div>
+      </main>
+
+      <main id="endScreen" class="wp-screen wp-screen--end">
+        <section class="wp-end-card">
+          <div class="wp-kicker" data-i18n="complete">The pond kept it</div>
+          <h2 id="finalScore">0</h2>
+          <div class="wp-stats">
+            <div><span data-i18n="best">Best</span><strong id="bestScore">0</strong></div>
+            <div><span data-i18n="stones">Stones</span><strong id="stoneCount">0</strong></div>
+            <div><span data-i18n="combo">Combo</span><strong id="bestCombo">1</strong></div>
+          </div>
+          <p id="finalThought" class="wp-final-thought"></p>
+          <div class="wp-actions">
+            <button id="againButton" class="wp-button wp-button--primary" type="button" data-i18n="again">Again</button>
+            <button id="changeButton" class="wp-button" type="button" data-i18n="change">New thought</button>
+            <button id="homeButton" class="wp-button" type="button" data-i18n="home">Home</button>
+          </div>
+        </section>
+      </main>
+
+      <img class="wp-watermark" src="./img/aigram.svg" alt="" draggable="false" />
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
