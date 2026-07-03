@@ -1,48 +1,49 @@
 import './styles.css';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import * as CANNON from 'cannon-es';
 
-const FIELD_W = 390;
-const FIELD_H = 680;
-const ROUND_MS = 60000;
+const COUNT = 500;
 const BEST_KEY = 'whisper_pond_best';
+const paletteSets = [
+  [[0.02, 0.32, 1], [1, 0.02, 0.1], [1, 0.78, 0], [0.02, 0.86, 0.24]],
+  [[0, 0.82, 0.74], [1, 0.32, 0], [0.54, 0.18, 1], [1, 0.08, 0.62]],
+  [[0, 0.7, 1], [0.48, 0.9, 0.04], [1, 0.22, 0.38], [1, 0.64, 0]],
+  [[0, 0.2, 1], [1, 0, 0], [0, 0.78, 0.34], [1, 0.52, 0]],
+];
 
 const messages = {
   en: {
-    time: 'Time',
-    echo: 'Echo',
-    kicker: 'A pond for one sentence',
-    title: 'Whisper Pond',
-    prompt: 'Drop one thought into the water',
-    placeholder: 'Something I am carrying...',
+    time: 'Bodies',
+    score: 'Sprays',
+    kicker: 'Bright cannon study',
+    title: 'Physics Pond',
+    startCopy: 'Orbit a lit physics shelf and pour color spheres through the blockers.',
     start: 'Begin',
-    hint: 'Tap the water',
-    complete: 'The pond kept it',
+    hint: 'Drag orbit · Tap burst · Hold stream',
+    complete: 'Physics study',
     best: 'Best',
-    stones: 'Stones',
-    combo: 'Combo',
+    stones: 'Bodies',
+    combo: 'Palette',
     again: 'Again',
-    change: 'New thought',
+    change: 'Color',
     home: 'Home',
-    defaultThought: 'stay soft',
-    comboLabel: 'Combo',
   },
   zh: {
-    time: '时间',
-    echo: '回声',
-    kicker: '给一句话的一汪水',
-    title: '心事水面',
-    prompt: '把一句心事放进水里',
-    placeholder: '我正在带着的事情...',
+    time: '小球',
+    score: '喷洒',
+    kicker: '明亮物理试验',
+    title: '物理池',
+    startCopy: '旋转观察明亮挡板，让彩色小球沿着障碍层层滚落。',
     start: '开始',
-    hint: '轻点水面',
-    complete: '水面记住了它',
+    hint: '拖动旋转 · 轻点喷球 · 长按连喷',
+    complete: '物理试验',
     best: '最高',
-    stones: '字石',
-    combo: '连击',
+    stones: '小球',
+    combo: '色盘',
     again: '再来一次',
-    change: '换一句',
+    change: '换色',
     home: '返回首页',
-    defaultThought: '慢慢来',
-    comboLabel: '连击',
   },
 };
 
@@ -58,17 +59,12 @@ const t = (key) => messages[locale][key] || messages.en[key] || key;
 document.querySelectorAll('[data-i18n]').forEach((el) => {
   el.textContent = t(el.dataset.i18n);
 });
-document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-  el.placeholder = t(el.dataset.i18nPlaceholder);
-});
 
-const canvas = document.getElementById('pond');
-const ctx = canvas.getContext('2d', { alpha: true });
+const stage = document.getElementById('stage');
 const startScreen = document.getElementById('startScreen');
 const gameScreen = document.getElementById('gameScreen');
 const endScreen = document.getElementById('endScreen');
 const hud = document.querySelector('.wp-hud');
-const thoughtInput = document.getElementById('thoughtInput');
 const startButton = document.getElementById('startButton');
 const againButton = document.getElementById('againButton');
 const changeButton = document.getElementById('changeButton');
@@ -83,28 +79,139 @@ const finalThought = document.getElementById('finalThought');
 const comboBadge = document.getElementById('comboBadge');
 const hint = document.getElementById('hint');
 
-let width = FIELD_W;
-let height = FIELD_H;
-let dpr = 1;
 let phase = 'start';
-let score = 0;
-let best = Number.parseInt(localStorage.getItem(BEST_KEY) || '0', 10);
-let stonesDropped = 0;
-let maxCombo = 1;
-let combo = 0;
-let lastTapTime = 0;
-let roundStart = 0;
-let thought = '';
-let tokens = [t('defaultThought')];
-let tokenIndex = 0;
-let autoRippleAt = 0;
-let comboHideTimer = 0;
-
-const ripples = [];
-const stones = [];
-const sparks = [];
-
+let sprayCount = 0;
+let paletteIndex = 0;
+let pointerDownAt = 0;
+let pointerMoved = false;
+let streamTimer = 0;
 let audioCtx = null;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(stage.clientWidth, stage.clientHeight);
+renderer.setClearColor(0xf8f7f2, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf8f7f2);
+
+const camera = new THREE.PerspectiveCamera(45, stage.clientWidth / stage.clientHeight, 0.1, 100);
+camera.position.set(0, 0, 7);
+
+const controls = new OrbitControls(camera, gameScreen);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.minDistance = 4.3;
+controls.maxDistance = 10;
+controls.target.set(0, -0.3, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.15));
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd7c5ad, 0.65));
+
+const keyLight = new THREE.SpotLight(0xffffff, 1.15, 14, Math.PI / 3, 0.55, 1.1);
+keyLight.position.set(0, 1.2, 3);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+scene.add(keyLight);
+
+const warmLight = new THREE.SpotLight(0xff4c57, 0.8, 12, Math.PI / 3, 0.55, 1.1);
+warmLight.position.set(0, -1.2, 3);
+warmLight.castShadow = true;
+warmLight.shadow.mapSize.set(1024, 1024);
+scene.add(warmLight);
+
+const plane = new THREE.Mesh(
+  new THREE.PlaneGeometry(15, 15),
+  new THREE.MeshPhongMaterial({ color: 0xe9e4d7, shininess: 34 }),
+);
+plane.position.z = -0.16;
+plane.receiveShadow = true;
+scene.add(plane);
+
+const world = new CANNON.World({
+  gravity: new CANNON.Vec3(0, -9.82, 0),
+});
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.allowSleep = true;
+const contactMaterial = new CANNON.Material('contact');
+world.defaultContactMaterial = new CANNON.ContactMaterial(contactMaterial, contactMaterial, {
+  friction: 0.08,
+  restitution: 0.38,
+});
+
+const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+const sphereVertexColors = new Float32Array(sphereGeometry.attributes.position.count * 3);
+sphereVertexColors.fill(1);
+sphereGeometry.setAttribute('color', new THREE.BufferAttribute(sphereVertexColors, 3));
+const sphereMaterial = new THREE.MeshPhongMaterial({
+  vertexColors: true,
+  shininess: 72,
+  specular: 0xffffff,
+});
+const spheres = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, COUNT);
+spheres.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+spheres.castShadow = true;
+spheres.receiveShadow = true;
+spheres.frustumCulled = false;
+scene.add(spheres);
+
+const rampGeometry = new THREE.BoxGeometry(3, 0.05, 0.5);
+const rampMaterial = new THREE.MeshPhongMaterial({ color: 0xd4d1c8, shininess: 26 });
+const rampBodies = [];
+const rampMeshes = [];
+
+for (let i = 0; i < 6; i += 1) {
+  const x = i % 2 ? -1 : 1;
+  const y = (i - 3.5) * 1.5;
+  const angle = (i % 2 ? 1 : -1) * Math.PI / 6;
+  const ramp = new THREE.Mesh(rampGeometry, rampMaterial.clone());
+  ramp.position.set(x, y, 0);
+  ramp.rotation.z = angle;
+  ramp.castShadow = true;
+  ramp.receiveShadow = true;
+  scene.add(ramp);
+  rampMeshes.push(ramp);
+
+  const body = new CANNON.Body({
+    mass: 0,
+    material: contactMaterial,
+    shape: new CANNON.Box(new CANNON.Vec3(1.5, 0.025, 0.25)),
+  });
+  body.position.set(x, y, 0);
+  body.quaternion.setFromEuler(0, 0, angle);
+  world.addBody(body);
+  rampBodies.push(body);
+}
+
+const wallShape = new CANNON.Box(new CANNON.Vec3(0.08, 8, 0.35));
+[-1.72, 1.72].forEach((x) => {
+  const body = new CANNON.Body({ mass: 0, material: contactMaterial, shape: wallShape });
+  body.position.set(x, -0.8, 0);
+  world.addBody(body);
+});
+
+const bodies = Array.from({ length: COUNT }, (_, i) => {
+  const scale = THREE.MathUtils.randFloat(0.45, 1);
+  const body = new CANNON.Body({
+    mass: scale * 0.012,
+    material: contactMaterial,
+    shape: new CANNON.Sphere(0.1 * scale),
+    linearDamping: 0.54,
+    angularDamping: 0.58,
+  });
+  world.addBody(body);
+  resetBody(body, i, true);
+  return { body, scale };
+});
+
+const dummy = new THREE.Object3D();
+const color = new THREE.Color();
+let previousTime = performance.now();
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -116,65 +223,36 @@ function getAudioContext() {
 
 function resumeAudio() {
   try {
-    const audio = getAudioContext();
-    if (audio.state === 'suspended') audio.resume();
-  } catch {
-    // Audio is optional in restricted browsers.
-  }
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+  } catch {}
 }
 
 function tone(freq, duration, options = {}) {
   try {
-    const audio = getAudioContext();
-    const now = audio.currentTime + (options.delay || 0);
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
+    const ctx = getAudioContext();
+    const now = ctx.currentTime + (options.delay || 0);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     osc.type = options.type || 'sine';
     osc.frequency.setValueAtTime(freq, now);
-    if (options.freqEnd) {
-      osc.frequency.exponentialRampToValueAtTime(Math.max(1, options.freqEnd), now + duration);
-    }
-    gain.gain.setValueAtTime(options.gain ?? 0.04, now);
+    if (options.freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(1, options.freqEnd), now + duration);
+    gain.gain.setValueAtTime(options.gain ?? 0.035, now);
     gain.gain.exponentialRampToValueAtTime(options.gainEnd ?? 0.001, now + duration);
-    osc.connect(gain).connect(audio.destination);
+    osc.connect(gain).connect(ctx.destination);
     osc.start(now);
     osc.stop(now + duration);
-  } catch {
-    // Keep gameplay running without audio.
-  }
-}
-
-function playClick() {
-  tone(520, 0.045, { type: 'square', freqEnd: 360, gain: 0.025 });
+  } catch {}
 }
 
 function playStart() {
-  tone(440, 0.12, { freqEnd: 660, gain: 0.055 });
-  tone(660, 0.16, { freqEnd: 880, gain: 0.05, delay: 0.08 });
+  tone(300, 0.1, { type: 'triangle', freqEnd: 520, gain: 0.045 });
+  tone(620, 0.12, { delay: 0.06, gain: 0.03 });
 }
 
-function playDrop(activeCombo) {
-  tone(190, 0.11, { type: 'triangle', freqEnd: 130, gain: 0.045 });
-  tone(520, 0.18, { type: 'sine', gain: 0.018 });
-  if (activeCombo >= 2) {
-    tone(620 + activeCombo * 40, 0.09, { type: 'sine', gain: 0.022 });
-  }
-}
-
-function playComplete() {
-  [392, 523, 659, 784].forEach((freq, i) => {
-    tone(freq, 0.22, { type: 'sine', gain: 0.04, delay: i * 0.07 });
-  });
-}
-
-function resize() {
-  const rect = canvas.getBoundingClientRect();
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
-  width = rect.width;
-  height = rect.height;
-  canvas.width = Math.max(1, Math.round(width * dpr));
-  canvas.height = Math.max(1, Math.round(height * dpr));
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+function playSpray() {
+  tone(180, 0.07, { type: 'square', freqEnd: 90, gain: 0.018 });
+  tone(560 + paletteIndex * 45, 0.08, { type: 'sine', gain: 0.022 });
 }
 
 function setPhase(nextPhase) {
@@ -185,295 +263,159 @@ function setPhase(nextPhase) {
   hud.classList.toggle('is-visible', nextPhase === 'playing');
 }
 
-function splitThought(value) {
-  const clean = value.trim().replace(/\s+/g, ' ');
-  if (!clean) return [t('defaultThought')];
-  const words = clean.match(/[a-zA-Z0-9']+|[\u4e00-\u9fff]{1,2}|[^\s]/g);
-  return words && words.length ? words.slice(0, 32) : [clean.slice(0, 8)];
+function resetBody(body, i, high = false) {
+  const lane = ((i % 24) / 23 - 0.5) * 2.6;
+  body.position.set(lane + THREE.MathUtils.randFloatSpread(0.32), high ? 5 + Math.random() * 2 : THREE.MathUtils.randFloatSpread(6), 0);
+  body.velocity.set(THREE.MathUtils.randFloatSpread(0.2), THREE.MathUtils.randFloat(-0.2, 0.2), 0);
+  body.angularVelocity.set(THREE.MathUtils.randFloatSpread(2), THREE.MathUtils.randFloatSpread(2), THREE.MathUtils.randFloatSpread(2));
+  body.quaternion.set(0, 0, 0, 1);
+  body.force.set(0, 0, 0);
+  body.torque.set(0, 0, 0);
+}
+
+function updateColors() {
+  const palette = paletteSets[paletteIndex];
+  for (let i = 0; i < COUNT; i += 1) {
+    color.setRGB(...palette[i % palette.length]);
+    spheres.setColorAt(i, color);
+  }
+  if (spheres.instanceColor) spheres.instanceColor.needsUpdate = true;
+  bestCombo.textContent = String(paletteIndex + 1);
+}
+
+function randomColors() {
+  paletteIndex = (paletteIndex + 1) % paletteSets.length;
+  updateColors();
+  tone(660 + paletteIndex * 70, 0.1, { gain: 0.03 });
+}
+
+function spray(amount = 32) {
+  if (phase !== 'playing') return;
+  resumeAudio();
+  playSpray();
+  for (let j = 0; j < amount; j += 1) {
+    resetBody(bodies[(sprayCount * amount + j) % COUNT].body, j, true);
+  }
+  sprayCount += 1;
+  scoreValue.textContent = String(sprayCount);
+  finalScore.textContent = String(sprayCount);
+  const best = Math.max(Number.parseInt(localStorage.getItem(BEST_KEY) || '0', 10), sprayCount);
+  localStorage.setItem(BEST_KEY, String(best));
+  bestScore.textContent = String(best);
+  comboBadge.textContent = `+${amount}`;
+  comboBadge.classList.add('is-visible');
+  window.setTimeout(() => comboBadge.classList.remove('is-visible'), 180);
 }
 
 function startGame() {
   resumeAudio();
   playStart();
-  thought = thoughtInput.value.trim() || t('defaultThought');
-  tokens = splitThought(thought);
-  tokenIndex = 0;
-  score = 0;
-  stonesDropped = 0;
-  maxCombo = 1;
-  combo = 0;
-  lastTapTime = 0;
-  roundStart = performance.now();
-  ripples.length = 0;
-  stones.length = 0;
-  sparks.length = 0;
+  sprayCount = 0;
   scoreValue.textContent = '0';
-  timeLeft.textContent = '60';
+  finalScore.textContent = '0';
+  stoneCount.textContent = String(COUNT);
+  finalThought.textContent = '';
   hint.classList.remove('is-hidden');
   setPhase('playing');
+  for (let i = 0; i < COUNT; i += 1) resetBody(bodies[i].body, i, i < 360);
+  spray(44);
 }
 
-function endGame() {
-  if (phase !== 'playing') return;
-  phase = 'end';
-  best = Math.max(best, score);
-  localStorage.setItem(BEST_KEY, String(best));
-  finalScore.textContent = String(score);
-  bestScore.textContent = String(best);
-  stoneCount.textContent = String(stonesDropped);
-  bestCombo.textContent = String(maxCombo);
-  finalThought.textContent = `“${thought}”`;
-  playComplete();
-  setPhase('end');
-}
+function syncMeshes() {
+  for (let i = 0; i < COUNT; i += 1) {
+    const { body, scale } = bodies[i];
+    if (body.position.y < -7.2 || Math.abs(body.position.x) > 2.7) resetBody(body, i, true);
+    body.position.z = 0;
+    body.velocity.z = 0;
+    body.force.z = 0;
 
-function addRipple(x, y, now, soft = false) {
-  const strength = soft ? 0.48 : 1;
-  const layers = soft ? 1 : 3;
-  for (let i = 0; i < layers; i += 1) {
-    ripples.push({
-      x,
-      y,
-      born: now,
-      start: 8 + i * 6,
-      speed: [140, 110, 82][i] || 92,
-      life: [1400, 1900, 2300][i] || 1600,
-      strength,
-    });
+    dummy.position.copy(body.position);
+    dummy.position.z = 0.18;
+    dummy.quaternion.copy(body.quaternion);
+    dummy.scale.setScalar(scale);
+    dummy.updateMatrix();
+    spheres.setMatrixAt(i, dummy.matrix);
   }
-  if (ripples.length > 46) ripples.splice(0, ripples.length - 46);
+  spheres.instanceMatrix.needsUpdate = true;
 }
 
-function addStone(x, y, now) {
-  const text = tokens[tokenIndex % tokens.length];
-  tokenIndex += 1;
-  stones.push({
-    text,
-    x,
-    y,
-    vx: -14 + Math.random() * 28,
-    vy: -28 + Math.random() * 20,
-    born: now,
-    life: 4800,
-  });
-  if (stones.length > 9) stones.shift();
-}
-
-function addSparks(x, y, now) {
-  for (let i = 0; i < 8; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 12 + Math.random() * 34;
-    sparks.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      size: 1.2 + Math.random() * 2.5,
-      born: now,
-      life: 1200 + Math.random() * 1000,
-    });
-  }
-  if (sparks.length > 80) sparks.splice(0, sparks.length - 80);
-}
-
-function handleWaterPointer(event) {
-  if (phase !== 'playing') return;
-  event.preventDefault();
-  resumeAudio();
-  const rect = canvas.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const y = event.clientY - rect.top;
+function render() {
   const now = performance.now();
-  combo = now - lastTapTime <= 1800 ? Math.min(combo + 1, 5) : 1;
-  lastTapTime = now;
-  maxCombo = Math.max(maxCombo, combo);
-  const points = 10 + combo * 3;
-  score += points;
-  stonesDropped += 1;
-  scoreValue.textContent = String(score);
-  addRipple(x, y, now);
-  addStone(x, y, now);
-  addSparks(x, y, now);
-  playDrop(combo);
-  hint.classList.add('is-hidden');
-  if (combo >= 2) showCombo(combo);
+  const dt = Math.min(1 / 30, (now - previousTime) / 1000);
+  previousTime = now;
+  world.step(1 / 60, dt, 3);
+  syncMeshes();
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(render);
 }
 
-function showCombo(value) {
-  window.clearTimeout(comboHideTimer);
-  comboBadge.textContent = `${t('comboLabel')} x${value}`;
-  comboBadge.classList.add('is-visible');
-  comboHideTimer = window.setTimeout(() => comboBadge.classList.remove('is-visible'), 520);
+function resize() {
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
 }
 
-function drawBackground(now) {
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, '#07111f');
-  gradient.addColorStop(0.55, '#0b2035');
-  gradient.addColorStop(1, '#182936');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  const sway = Math.sin(now * 0.00022) * 26;
-  const glow = ctx.createRadialGradient(width * 0.52 + sway, height * 0.42, 0, width * 0.52 + sway, height * 0.42, Math.max(width, height) * 0.55);
-  glow.addColorStop(0, 'rgba(87, 231, 219, 0.18)');
-  glow.addColorStop(0.38, 'rgba(32, 89, 114, 0.12)');
-  glow.addColorStop(1, 'rgba(7, 17, 31, 0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.save();
-  ctx.globalAlpha = 0.18;
-  ctx.strokeStyle = '#7cf6e5';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 9; i += 1) {
-    const y = height * (0.18 + i * 0.08);
-    ctx.beginPath();
-    for (let x = -20; x <= width + 20; x += 14) {
-      const wave = Math.sin(x * 0.018 + now * 0.00045 + i) * (4 + i * 0.3);
-      if (x === -20) ctx.moveTo(x, y + wave);
-      else ctx.lineTo(x, y + wave);
-    }
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawRipples(now) {
-  for (let i = ripples.length - 1; i >= 0; i -= 1) {
-    const ripple = ripples[i];
-    const age = now - ripple.born;
-    if (age > ripple.life) {
-      ripples.splice(i, 1);
-      continue;
-    }
-    const p = age / ripple.life;
-    const radius = ripple.start + ripple.speed * (age / 1000);
-    const alpha = (1 - p) * 0.72 * ripple.strength;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = '#dffff8';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.globalAlpha = alpha * 0.32;
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = '#3ad8c6';
-    ctx.beginPath();
-    ctx.arc(ripple.x, ripple.y, radius * 0.68, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-function drawSparks(now) {
-  for (let i = sparks.length - 1; i >= 0; i -= 1) {
-    const spark = sparks[i];
-    const age = now - spark.born;
-    if (age > spark.life) {
-      sparks.splice(i, 1);
-      continue;
-    }
-    const dt = age / 1000;
-    const p = age / spark.life;
-    const x = spark.x + spark.vx * dt;
-    const y = spark.y + spark.vy * dt;
-    ctx.save();
-    ctx.globalAlpha = (1 - p) * 0.62;
-    ctx.fillStyle = '#d7fff5';
-    ctx.beginPath();
-    ctx.arc(x, y, spark.size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-function drawStones(now) {
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = '700 13px Inter, system-ui, sans-serif';
-  for (let i = stones.length - 1; i >= 0; i -= 1) {
-    const stone = stones[i];
-    const age = now - stone.born;
-    if (age > stone.life) {
-      stones.splice(i, 1);
-      continue;
-    }
-    const dt = age / 1000;
-    const p = age / stone.life;
-    const x = stone.x + stone.vx * dt + Math.sin(age * 0.003) * 7;
-    const y = stone.y + stone.vy * dt;
-    ctx.save();
-    ctx.globalAlpha = Math.sin(Math.min(1, p) * Math.PI) * 0.82;
-    ctx.shadowColor = 'rgba(90, 235, 220, 0.45)';
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = 'rgba(248, 251, 255, 0.92)';
-    ctx.fillText(stone.text, x, y);
-    ctx.restore();
-  }
-}
-
-function maybeIdleRipple(now) {
-  if (phase === 'playing') return;
-  if (now < autoRippleAt) return;
-  autoRippleAt = now + 1700;
-  addRipple(width * (0.2 + Math.random() * 0.6), height * (0.2 + Math.random() * 0.58), now, true);
-}
-
-function updateRound(now) {
+function onPointerDown(event) {
   if (phase !== 'playing') return;
-  const remaining = Math.max(0, ROUND_MS - (now - roundStart));
-  timeLeft.textContent = String(Math.ceil(remaining / 1000));
-  if (remaining <= 0) endGame();
+  pointerDownAt = performance.now();
+  pointerMoved = false;
+  hint.classList.add('is-hidden');
+  clearInterval(streamTimer);
+  streamTimer = window.setInterval(() => spray(12), 130);
+  controls.autoRotate = false;
 }
 
-function frame(now) {
-  maybeIdleRipple(now);
-  updateRound(now);
-  drawBackground(now);
-  drawRipples(now);
-  drawSparks(now);
-  drawStones(now);
-  requestAnimationFrame(frame);
+function onPointerMove() {
+  if (phase === 'playing') pointerMoved = true;
 }
+
+function onPointerUp() {
+  clearInterval(streamTimer);
+  if (phase !== 'playing') return;
+  const elapsed = performance.now() - pointerDownAt;
+  if (!pointerMoved && elapsed < 430) spray(36);
+}
+
+timeLeft.textContent = String(COUNT);
+stoneCount.textContent = String(COUNT);
+bestScore.textContent = localStorage.getItem(BEST_KEY) || '0';
+bestCombo.textContent = '1';
+finalThought.textContent = '';
+updateColors();
+setPhase('start');
+resize();
+requestAnimationFrame(render);
 
 startButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
   startGame();
 });
-
 againButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
-  playClick();
   startGame();
 });
-
 changeButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
-  playClick();
-  setPhase('start');
-  requestAnimationFrame(() => thoughtInput.focus());
+  randomColors();
 });
-
 homeButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
-  playClick();
-  thoughtInput.value = '';
   setPhase('start');
 });
-
-thoughtInput.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' || event.shiftKey) return;
-  event.preventDefault();
-  startGame();
-});
-
-gameScreen.addEventListener('pointerdown', handleWaterPointer, { passive: false });
+gameScreen.addEventListener('pointerdown', onPointerDown, { passive: true });
+window.addEventListener('pointermove', onPointerMove, { passive: true });
+window.addEventListener('pointerup', onPointerUp, { passive: true });
+window.addEventListener('pointercancel', onPointerUp, { passive: true });
 window.addEventListener('resize', resize);
-
-thoughtInput.value = locale === 'zh' ? '把今天轻轻放下' : 'let today sink softly';
-setPhase('start');
-resize();
-requestAnimationFrame(frame);
+window.addEventListener('keydown', (event) => {
+  if (event.code === 'Space') {
+    event.preventDefault();
+    if (phase === 'start') startGame();
+    else spray(44);
+  }
+  if (event.code === 'KeyC') randomColors();
+});
