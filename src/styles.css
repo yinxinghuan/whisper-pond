@@ -54,7 +54,7 @@ button {
 .wp-glass {
   z-index: 2;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 48%, transparent 0 64%, rgba(54, 45, 32, 0.08) 100%);
+  background: radial-gradient(circle at 50% 48%, transparent 0 72%, rgba(54, 45, 32, 0.035) 100%);
 }
 
 .wp-hud {
@@ -299,10 +299,9 @@ h2 {
   right: 14px;
   bottom: calc(14px + env(safe-area-inset-bottom));
   z-index: 24;
-  width: 52px;
-  opacity: 0.42;
+  width: 28px;
+  opacity: 0.72;
   pointer-events: none;
-  filter: invert(1);
 }
 
 @keyframes wp-hint-pulse {

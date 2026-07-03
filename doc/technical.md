@@ -4,7 +4,7 @@
 
 - 构建：Vite 5，`base: './'`，产物可部署到任意子路径。
 - 语言：Vanilla JavaScript ES Module。
-- 渲染：Three.js WebGLRenderer、InstancedMesh、MeshPhongMaterial、OrbitControls。
+- 渲染：Three.js WebGLRenderer、InstancedMesh、MeshToonMaterial、MeshPhongMaterial、OrbitControls。
 - 物理：cannon-es World、Sphere、Box、SAPBroadphase、ContactMaterial。
 - 输入：Pointer Events、Keyboard Events、OrbitControls。
 - 音频：Web Audio API 实时合成。
@@ -25,10 +25,10 @@
 - 屏幕适配：`resize()` 根据 `stage.clientWidth/clientHeight` 更新 renderer pixel ratio、canvas size 和 camera aspect；CSS 在桌面端固定 390px × 680px，移动端全屏。
 - 物理世界：`world.gravity` 为 `(0,-9.82,0)`，`SAPBroadphase` 加速碰撞，默认 ContactMaterial 设置 friction=0.08、restitution=0.38。
 - 球体系统：`bodies` 保存 500 个 Cannon Sphere body 和 scale；Three.js 端用一个 `InstancedMesh` 批量渲染 500 个球体，球几何补全白色 vertex color，并用 instance color 控制调色盘。
-- 防漏球约束：每帧在 `syncMeshes()` 中强制 `body.position.z=0`、`body.velocity.z=0`、`body.force.z=0`；挡板碰撞体 z halfExtent 为 0.25，侧墙位于 x=-1.72 和 x=1.72；动态 InstancedMesh 关闭 `frustumCulled`，避免主相机只看见阴影。
+- 防漏球约束：每帧在 `syncMeshes()` 中强制 `body.position.z=0`、`body.velocity.z=0`、`body.force.z=0`；挡板碰撞体 z halfExtent 为 0.1；动态 InstancedMesh 关闭 `frustumCulled`，避免主相机只看见阴影。
 - 挡板系统：6 个 Three.js Box mesh 与 6 个 mass=0 Cannon Box body 使用相同位置和 z 旋转，形成交错下落路径。
-- 喷球系统：`spray(amount)` 将一批 body 重置到上方 y=5 到 7，递增 sprays 计数并写入 `localStorage` 最高值。
-- 色盘系统：`paletteSets` 保存 4 组 4 色；`updateColors()` 对 500 个 instance color 批量赋值；换色按钮和 C 键调用 `randomColors()`。
+- 回收系统：`syncMeshes()` 中检测 `body.position.y < -7` 后调用 `resetBody(body, i, true)`，将球体重置到上方继续自然下落。
+- 色盘系统：`paletteSets` 保存 4 组 5 色；`updateColors()` 对 500 个 instance color 批量赋值；点按、换色按钮、Space 和 C 键调用 `randomColors()`。
 - 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光、半球光和两盏聚光灯保证画面明亮。
 - 多语言：`messages` 提供 zh/en 文案；`detectLocale()` 优先读取 `localStorage.game_locale`，再根据浏览器语言判断。
 - 音频：`tone()` 封装 OscillatorNode 和 GainNode；开始、喷球、换色都有短音效，音频解锁在用户手势后执行。
