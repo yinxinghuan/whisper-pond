@@ -1,10 +1,13 @@
 import './styles.css';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as CANNON from 'cannon-es';
 
 const COUNT = 500;
 const GAME_DURATION = 60;
+const TARGET_SWITCH_INTERVAL = 12;
+const RAMP_MIN_ANGLE = -THREE.MathUtils.degToRad(42);
+const RAMP_MAX_ANGLE = THREE.MathUtils.degToRad(42);
+const RAMP_DRAG_SENSITIVITY = 0.42;
 const BEST_KEY = 'whisper_pond_best';
 const paletteSets = [
   ['#3b82f6', '#f43f5e', '#facc15', '#22c55e', '#f97316'],
@@ -19,34 +22,40 @@ const messages = {
     score: 'Score',
     kicker: 'Bright cannon study',
     title: 'Physics Pond',
-    startCopy: 'Orbit the shelf, cycle the colors, and let falling spheres score through the matching slots.',
+    startCopy: 'Drag the planks to steer falling spheres into the glowing target slot.',
     start: 'Begin',
-    hint: 'Drag orbit · Tap color · Match the slots',
+    hint: 'Drag planks · Feed the glowing slot',
     complete: 'Pond settled',
     best: 'Best',
     stones: 'Caught',
     combo: 'Streak',
     again: 'Again',
-    change: 'Color',
+    change: 'Target',
     home: 'Home',
-    settled: 'Matched colors settle deeper.',
+    settled: 'The best paths are built by small plank moves.',
+    targetLeft: 'LEFT',
+    targetCenter: 'CENTER',
+    targetRight: 'RIGHT',
   },
   zh: {
     time: '时间',
     score: '得分',
     kicker: '明亮物理试验',
     title: '物理池',
-    startCopy: '旋转观察挡板，切换色盘，让滚落的小球进入匹配颜色槽得分。',
+    startCopy: '拖动挡板改变角度，把滚落的小球导入发光目标槽。',
     start: '开始',
-    hint: '拖动旋转 · 轻点换色 · 匹配色槽',
+    hint: '拖动挡板 · 导入发光槽',
     complete: '物理结算',
     best: '最高',
     stones: '收集',
     combo: '连击',
     again: '再来一次',
-    change: '换色',
+    change: '换目标',
     home: '返回首页',
-    settled: '颜色匹配时，落点更有意义。',
+    settled: '好路径来自几次很小的挡板调整。',
+    targetLeft: '左槽',
+    targetCenter: '中槽',
+    targetRight: '右槽',
   },
 };
 
@@ -86,16 +95,21 @@ const hint = document.getElementById('hint');
 
 let phase = 'start';
 let paletteIndex = 0;
-let pointerDownAt = 0;
-let pointerMoved = false;
 let score = 0;
 let collected = 0;
 let streak = 0;
 let bestStreak = 0;
 let remaining = GAME_DURATION;
+let targetSlot = 1;
+let targetTimer = TARGET_SWITCH_INTERVAL;
 let lastCollectTone = 0;
+let lastDragTone = 0;
 let comboTimer = 0;
 let audioCtx = null;
+let activeRamp = null;
+let selectedRampIndex = 2;
+let dragStartX = 0;
+let dragStartAngle = 0;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -111,14 +125,7 @@ scene.background = new THREE.Color(0xf8f7f2);
 
 const camera = new THREE.PerspectiveCamera(45, stage.clientWidth / stage.clientHeight, 0.1, 100);
 camera.position.set(0, 0, 7);
-
-const controls = new OrbitControls(camera, gameScreen);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.enablePan = false;
-controls.minDistance = 4.3;
-controls.maxDistance = 10;
-controls.target.set(0, -0.3, 0);
+camera.lookAt(0, -0.3, 0);
 
 scene.add(new THREE.AmbientLight(0xaaaaaa, 1.15));
 scene.add(new THREE.HemisphereLight(0xffffff, 0xd7c5ad, 0.45));
@@ -170,6 +177,7 @@ scene.add(spheres);
 
 const rampGeometry = new THREE.BoxGeometry(3, 0.05, 0.2);
 const rampMaterial = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 26 });
+const ramps = [];
 
 for (let i = 0; i < 6; i += 1) {
   const x = i % 2 ? -1 : 1;
@@ -190,6 +198,7 @@ for (let i = 0; i < 6; i += 1) {
   body.position.set(x, y, 0);
   body.quaternion.setFromEuler(0, 0, angle);
   world.addBody(body);
+  ramps.push({ mesh: ramp, body, angle, startAngle: angle });
 }
 
 const slotGeometry = new THREE.BoxGeometry(0.82, 0.1, 0.22);
@@ -226,6 +235,10 @@ const bodies = Array.from({ length: COUNT }, (_, i) => {
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
+const pointer = new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
+const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const planePoint = new THREE.Vector3();
 let previousTime = performance.now();
 
 function getAudioContext() {
@@ -273,6 +286,17 @@ function playCollect(match) {
   else tone(180, 0.07, { type: 'triangle', freqEnd: 150, gain: 0.018 });
 }
 
+function playTarget() {
+  tone(560, 0.11, { type: 'sine', freqEnd: 760, gain: 0.028 });
+}
+
+function playDrag() {
+  const now = performance.now();
+  if (now - lastDragTone < 180) return;
+  lastDragTone = now;
+  tone(260, 0.045, { type: 'triangle', freqEnd: 300, gain: 0.012 });
+}
+
 function playEnd() {
   tone(240, 0.18, { type: 'sine', freqEnd: 360, gain: 0.035 });
 }
@@ -295,6 +319,46 @@ function resetBody(body, i, high = false) {
   body.torque.set(0, 0, 0);
 }
 
+function applyRampAngle(ramp, angle) {
+  ramp.angle = THREE.MathUtils.clamp(angle, RAMP_MIN_ANGLE, RAMP_MAX_ANGLE);
+  ramp.mesh.rotation.z = ramp.angle;
+  ramp.body.quaternion.setFromEuler(0, 0, ramp.angle);
+  ramp.body.aabbNeedsUpdate = true;
+}
+
+function updateRampHighlights() {
+  ramps.forEach((ramp, i) => {
+    const isSelected = i === selectedRampIndex;
+    ramp.mesh.material.color.set(isSelected ? 0xd8d3c5 : 0xaaaaaa);
+    ramp.mesh.material.emissive.set(isSelected ? 0x262018 : 0x000000);
+    ramp.mesh.material.emissiveIntensity = isSelected ? 0.35 : 0;
+  });
+}
+
+function projectPointerToPlane(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  return raycaster.ray.intersectPlane(dragPlane, planePoint);
+}
+
+function findRampAt(point) {
+  let best = null;
+  let bestScore = Infinity;
+  for (let i = 0; i < ramps.length; i += 1) {
+    const ramp = ramps[i];
+    const local = ramp.mesh.worldToLocal(point.clone());
+    const inside = Math.abs(local.x) <= 1.8 && Math.abs(local.y) <= 0.58;
+    const score = Math.abs(local.y) * 2.4 + Math.max(0, Math.abs(local.x) - 1.45);
+    if ((inside || score < 0.95) && score < bestScore) {
+      best = { ramp, index: i };
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 function updateColors() {
   const palette = paletteSets[paletteIndex];
   for (let i = 0; i < COUNT; i += 1) {
@@ -302,17 +366,45 @@ function updateColors() {
     spheres.setColorAt(i, color);
   }
   collectionSlots.forEach((slot, i) => {
+    const isTarget = i === targetSlot;
     slot.material.color.set(palette[i]);
+    slot.material.opacity = isTarget ? 0.95 : 0.34;
+    slot.scale.set(1, isTarget ? 1.55 : 1, 1);
     slotHudItems[i].style.background = palette[i];
-    slotHudItems[i].style.boxShadow = `0 0 22px ${palette[i]}66`;
+    slotHudItems[i].style.boxShadow = isTarget ? `0 0 28px ${palette[i]}` : `0 0 16px ${palette[i]}66`;
+    slotHudItems[i].classList.toggle('is-target', isTarget);
   });
   if (spheres.instanceColor) spheres.instanceColor.needsUpdate = true;
 }
 
-function randomColors() {
-  paletteIndex = (paletteIndex + 1) % paletteSets.length;
+function targetLabel() {
+  return [t('targetLeft'), t('targetCenter'), t('targetRight')][targetSlot];
+}
+
+function showStatus(text) {
+  comboBadge.textContent = text;
+  comboBadge.classList.add('is-visible');
+  window.clearTimeout(comboTimer);
+  comboTimer = window.setTimeout(() => comboBadge.classList.remove('is-visible'), 720);
+}
+
+function setTargetSlot(nextTarget, announce = true) {
+  targetSlot = ((nextTarget % 3) + 3) % 3;
+  targetTimer = TARGET_SWITCH_INTERVAL;
   updateColors();
-  tone(660 + paletteIndex * 70, 0.1, { gain: 0.03 });
+  if (announce) {
+    showStatus(targetLabel());
+    playTarget();
+  }
+}
+
+function nextTargetSlot() {
+  setTargetSlot(targetSlot + 1);
+}
+
+function updateTargetTimer(dt) {
+  targetTimer -= dt;
+  if (targetTimer <= 0) nextTargetSlot();
 }
 
 function updateHud() {
@@ -321,17 +413,14 @@ function updateHud() {
 }
 
 function showCombo(text) {
-  comboBadge.textContent = text;
-  comboBadge.classList.add('is-visible');
-  window.clearTimeout(comboTimer);
-  comboTimer = window.setTimeout(() => comboBadge.classList.remove('is-visible'), 720);
+  showStatus(text);
 }
 
 function collectBall(ball) {
-  const { body, colorIndex } = ball;
+  const { body } = ball;
   const slotIndex = body.position.x < -0.55 ? 0 : body.position.x > 0.55 ? 2 : 1;
-  const match = colorIndex % paletteSets[paletteIndex].length === slotIndex;
-  score += match ? 3 : 1;
+  const match = slotIndex === targetSlot;
+  score += match ? 5 : 1;
   collected += 1;
   if (match) {
     streak += 1;
@@ -350,9 +439,17 @@ function resetGameState() {
   streak = 0;
   bestStreak = 0;
   remaining = GAME_DURATION;
+  targetSlot = 1;
+  targetTimer = TARGET_SWITCH_INTERVAL;
   lastCollectTone = 0;
+  lastDragTone = 0;
+  activeRamp = null;
+  selectedRampIndex = 2;
   comboBadge.classList.remove('is-visible');
   window.clearTimeout(comboTimer);
+  ramps.forEach((ramp) => applyRampAngle(ramp, ramp.startAngle));
+  updateRampHighlights();
+  updateColors();
   updateHud();
 }
 
@@ -377,6 +474,7 @@ function startGame() {
   hint.classList.remove('is-hidden');
   setPhase('playing');
   for (let i = 0; i < COUNT; i += 1) resetBody(bodies[i].body, i, false);
+  showStatus(targetLabel());
 }
 
 function syncMeshes() {
@@ -408,10 +506,10 @@ function render() {
   syncMeshes();
   if (phase === 'playing') {
     remaining -= dt;
+    updateTargetTimer(dt);
     updateHud();
     if (remaining <= 0) endGame();
   }
-  controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(render);
 }
@@ -427,20 +525,33 @@ function resize() {
 
 function onPointerDown(event) {
   if (phase !== 'playing') return;
-  pointerDownAt = performance.now();
-  pointerMoved = false;
+  const point = projectPointerToPlane(event);
+  if (!point) return;
+  const picked = findRampAt(point);
+  if (!picked) return;
+  activeRamp = picked.ramp;
+  selectedRampIndex = picked.index;
+  dragStartX = point.x;
+  dragStartAngle = activeRamp.angle;
   hint.classList.add('is-hidden');
-  controls.autoRotate = false;
+  updateRampHighlights();
+  gameScreen.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
 }
 
-function onPointerMove() {
-  if (phase === 'playing') pointerMoved = true;
+function onPointerMove(event) {
+  if (phase !== 'playing' || !activeRamp) return;
+  const point = projectPointerToPlane(event);
+  if (!point) return;
+  applyRampAngle(activeRamp, dragStartAngle + (point.x - dragStartX) * RAMP_DRAG_SENSITIVITY);
+  playDrag();
+  event.preventDefault();
 }
 
-function onPointerUp() {
+function onPointerUp(event) {
   if (phase !== 'playing') return;
-  const elapsed = performance.now() - pointerDownAt;
-  if (!pointerMoved && elapsed < 430) randomColors();
+  activeRamp = null;
+  gameScreen.releasePointerCapture?.(event.pointerId);
 }
 
 timeLeft.textContent = String(GAME_DURATION);
@@ -450,6 +561,7 @@ bestCombo.textContent = '0';
 finalScore.textContent = '0';
 finalThought.textContent = '';
 updateColors();
+updateRampHighlights();
 updateHud();
 setPhase('start');
 resize();
@@ -465,22 +577,32 @@ againButton.addEventListener('pointerdown', (event) => {
 });
 changeButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
-  randomColors();
+  nextTargetSlot();
 });
 homeButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
   setPhase('start');
 });
-gameScreen.addEventListener('pointerdown', onPointerDown, { passive: true });
-window.addEventListener('pointermove', onPointerMove, { passive: true });
-window.addEventListener('pointerup', onPointerUp, { passive: true });
-window.addEventListener('pointercancel', onPointerUp, { passive: true });
+gameScreen.addEventListener('pointerdown', onPointerDown, { passive: false });
+window.addEventListener('pointermove', onPointerMove, { passive: false });
+window.addEventListener('pointerup', onPointerUp, { passive: false });
+window.addEventListener('pointercancel', onPointerUp, { passive: false });
 window.addEventListener('resize', resize);
 window.addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
     event.preventDefault();
     if (phase === 'start') startGame();
-    else randomColors();
   }
-  if (event.code === 'KeyC') randomColors();
+  if (event.code === 'Tab') {
+    event.preventDefault();
+    selectedRampIndex = (selectedRampIndex + 1) % ramps.length;
+    updateRampHighlights();
+  }
+  if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+    event.preventDefault();
+    const ramp = ramps[selectedRampIndex];
+    const delta = THREE.MathUtils.degToRad(event.code === 'ArrowLeft' ? -4 : 4);
+    applyRampAngle(ramp, ramp.angle + delta);
+    playDrag();
+  }
 });
