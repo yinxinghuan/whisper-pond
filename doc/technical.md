@@ -35,7 +35,7 @@
 - 收集与计分：`syncMeshes()` 检测 `body.position.y < -7` 后先调用 `collectBall()`，再 `resetBody(body, i, true)`；`collectBall()` 根据 x 坐标分配收集槽，命中 `targetSlot` 得 5 分、`levelHits + 1` 并增加 streak，否则得 1 分并清空 streak。
 - 计时与结算：每关 `remaining` 使用当前 `LEVELS[n].time`；`levelHits >= goal` 后进入下一关，第 5 关完成则通关；时间归零未达目标则失败结算；`endGame()` 写入最终分数、最高分、收集数和最高 streak，并更新 `localStorage.whisper_pond_best`。
 - 色彩系统：`paletteSets` 保存 4 组 5 色；当前版本固定使用第 1 组，颜色只服务于球体层次和底部目标槽可读性，不参与得分。
-- 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光强度 1.28、半球光强度 0.55，两盏聚光灯提供方向阴影；`centerLight` 在 `(-0.15,-0.25,2.4)` 提供强度 2.35 的中心亮斑，`centerGlow` 使用 CanvasTexture + AdditiveBlending 在球群汇聚区叠加 2.9 world units 暖白光晕。
+- 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光强度 1.28、半球光强度 0.55，两盏聚光灯提供方向阴影；`centerLight` 在 `(-0.15,-0.25,2.4)` 提供强度 1.55、距离 7.2、decay 1.3 的宽中心光，`centerGlow` 使用 CanvasTexture + AdditiveBlending 在球群汇聚区叠加 4.6 world units 暖白光晕，材质 opacity 为 0.5。
 - 多语言：`messages` 提供 zh/en 文案；`detectLocale()` 优先读取 `localStorage.game_locale`，再根据浏览器语言判断。
 - 音频：`tone()` 封装 OscillatorNode 和 GainNode；开始、换色、匹配收集、不匹配收集和结算都有短音效，音频解锁在用户手势后执行。
 
