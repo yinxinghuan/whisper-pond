@@ -52,6 +52,8 @@ const messages = {
     targetLeft: 'LEFT',
     targetCenter: 'CENTER',
     targetRight: 'RIGHT',
+    filled: 'FILLED',
+    missSlot: 'WRONG SLOT',
     leaderboardTitle: 'Leaderboard',
     leaderboardLoading: 'Loading...',
     leaderboardEmpty: 'No scores yet.',
@@ -83,6 +85,8 @@ const messages = {
     targetLeft: '左槽',
     targetCenter: '中槽',
     targetRight: '右槽',
+    filled: '已填充',
+    missSlot: '偏了',
     leaderboardTitle: '排行榜',
     leaderboardLoading: '加载中...',
     leaderboardEmpty: '还没有成绩。',
@@ -133,6 +137,9 @@ const objectiveTitle = document.getElementById('objectiveTitle');
 const objectiveDetail = document.getElementById('objectiveDetail');
 const slotHud = document.getElementById('slotHud');
 const slotHudItems = Array.from(slotHud.querySelectorAll('span'));
+const slotFillItems = Array.from(slotHud.querySelectorAll('.wp-slot-fill'));
+const slotNameItems = Array.from(slotHud.querySelectorAll('.wp-slot-name'));
+const slotCountItems = Array.from(slotHud.querySelectorAll('.wp-slot-count'));
 const slotLabels = document.getElementById('slotLabels');
 const slotLabelItems = Array.from(slotLabels.querySelectorAll('span'));
 const hint = document.getElementById('hint');
@@ -161,6 +168,7 @@ let activeRamp = null;
 let selectedRampIndex = 2;
 let dragStartX = 0;
 let dragStartAngle = 0;
+let lastSlotPop = 0;
 
 const Aigram = window.Aigram || {};
 const canRank = Boolean(Aigram.canRank && Aigram.gameUuid);
@@ -567,6 +575,35 @@ function findRampAt(point) {
   return best;
 }
 
+function updateSlotProgress() {
+  const ratio = Math.min(1, levelHits / Math.max(1, currentGoal()));
+  slotFillItems.forEach((fill, i) => {
+    fill.style.transform = `scaleX(${i === targetSlot ? ratio : 0})`;
+  });
+  slotCountItems.forEach((item, i) => {
+    item.textContent = i === targetSlot ? `${levelHits}/${currentGoal()}` : '';
+  });
+}
+
+function showSlotPop(slotIndex, text, good = true) {
+  const now = performance.now();
+  if (now - lastSlotPop < 90) return;
+  lastSlotPop = now;
+  const slot = slotHudItems[slotIndex];
+  if (!slot) return;
+  const slotRect = slot.getBoundingClientRect();
+  const gameRect = gameScreen.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.className = `wp-score-pop${good ? ' wp-score-pop--good' : ''}`;
+  pop.textContent = text;
+  pop.style.left = `${slotRect.left - gameRect.left + slotRect.width / 2}px`;
+  pop.style.top = `${slotRect.top - gameRect.top - 8}px`;
+  gameScreen.appendChild(pop);
+  window.setTimeout(() => pop.remove(), 760);
+  slot.classList.add('is-filled');
+  window.setTimeout(() => slot.classList.remove('is-filled'), 220);
+}
+
 function updateColors() {
   const palette = paletteSets[paletteIndex];
   const slotNames = [t('targetLeft'), t('targetCenter'), t('targetRight')];
@@ -579,12 +616,16 @@ function updateColors() {
     slot.material.color.set(palette[i]);
     slot.material.opacity = isTarget ? 0.95 : 0.34;
     slot.scale.set(1, isTarget ? 1.55 : 1, 1);
-    slotHudItems[i].style.background = palette[i];
-    slotHudItems[i].style.boxShadow = isTarget ? `0 0 28px ${palette[i]}` : `0 0 16px ${palette[i]}66`;
+    slotHudItems[i].style.setProperty('--slot-color', palette[i]);
+    slotHudItems[i].style.setProperty('--slot-soft', `${palette[i]}24`);
+    slotHudItems[i].style.setProperty('--slot-fill', `${palette[i]}cc`);
+    slotHudItems[i].style.setProperty('--slot-glow', `${palette[i]}99`);
     slotHudItems[i].classList.toggle('is-target', isTarget);
+    slotNameItems[i].textContent = slotNames[i];
     slotLabelItems[i].textContent = isTarget ? `${slotNames[i]} · ${t('targetMark')}` : slotNames[i];
     slotLabelItems[i].classList.toggle('is-target', isTarget);
   });
+  updateSlotProgress();
   if (spheres.instanceColor) spheres.instanceColor.needsUpdate = true;
 }
 
@@ -635,6 +676,7 @@ function updateHud() {
   timeLeft.textContent = String(Math.max(0, Math.ceil(remaining)));
   scoreValue.textContent = `${levelHits}/${currentGoal()}`;
   updateObjectivePanel();
+  updateSlotProgress();
 }
 
 function showCombo(text) {
@@ -651,6 +693,7 @@ function collectBall(ball) {
     levelHits += 1;
     streak += 1;
     bestStreak = Math.max(bestStreak, streak);
+    showSlotPop(slotIndex, `+1 ${t('filled')}`, true);
     if (streak > 0 && streak % 5 === 0) showCombo(`x${streak}`);
     if (levelHits >= currentGoal()) levelCompletePending = true;
   } else {
