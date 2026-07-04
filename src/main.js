@@ -127,16 +127,53 @@ const camera = new THREE.PerspectiveCamera(45, stage.clientWidth / stage.clientH
 camera.position.set(0, 0, 7);
 camera.lookAt(0, -0.3, 0);
 
-scene.add(new THREE.AmbientLight(0xaaaaaa, 1.15));
-scene.add(new THREE.HemisphereLight(0xffffff, 0xd7c5ad, 0.45));
+scene.add(new THREE.AmbientLight(0xffffff, 1.28));
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd7c5ad, 0.55));
 
-const keyLight = new THREE.SpotLight(0xaaaaaa, 0.72, 14, Math.PI / 3, 0.5, 1.1);
-keyLight.position.set(0, 1, 2);
+const centerLight = new THREE.PointLight(0xfff4cf, 2.35, 5.6, 1.55);
+centerLight.position.set(-0.15, -0.25, 2.4);
+scene.add(centerLight);
+
+function createGlowTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gradient.addColorStop(0, 'rgba(255, 250, 214, 0.95)');
+  gradient.addColorStop(0.24, 'rgba(255, 236, 164, 0.42)');
+  gradient.addColorStop(0.58, 'rgba(255, 210, 92, 0.12)');
+  gradient.addColorStop(1, 'rgba(255, 210, 92, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 256);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+const centerGlow = new THREE.Sprite(
+  new THREE.SpriteMaterial({
+    map: createGlowTexture(),
+    color: 0xfff3c2,
+    transparent: true,
+    opacity: 0.72,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  }),
+);
+centerGlow.position.set(-0.15, -0.25, 0.18);
+centerGlow.scale.set(2.9, 2.9, 1);
+centerGlow.renderOrder = 4;
+scene.add(centerGlow);
+
+const keyLight = new THREE.SpotLight(0xffffff, 0.86, 14, Math.PI / 3, 0.5, 1.1);
+keyLight.position.set(0, 1, 2.4);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
 scene.add(keyLight);
 
-const warmLight = new THREE.SpotLight(0xff0000, 0.58, 12, Math.PI / 3, 0.5, 1.1);
+const warmLight = new THREE.SpotLight(0xff5b42, 0.62, 12, Math.PI / 3, 0.5, 1.1);
 warmLight.position.set(0, -1, 2);
 warmLight.castShadow = true;
 warmLight.shadow.mapSize.set(1024, 1024);
@@ -144,7 +181,7 @@ scene.add(warmLight);
 
 const plane = new THREE.Mesh(
   new THREE.PlaneGeometry(15, 15),
-  new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 28 }),
+  new THREE.MeshPhongMaterial({ color: 0xb8b4aa, shininess: 34 }),
 );
 plane.position.z = -0.1;
 plane.receiveShadow = true;

@@ -34,7 +34,7 @@
 - 收集与计分：`syncMeshes()` 检测 `body.position.y < -7` 后先调用 `collectBall()`，再 `resetBody(body, i, true)`；`collectBall()` 根据 x 坐标分配收集槽，命中 `targetSlot` 得 5 分并增加 streak，否则得 1 分并清空 streak。
 - 计时与结算：`remaining` 从 60 秒递减；`endGame()` 写入最终分数、最高分、收集数和最高 streak，并更新 `localStorage.whisper_pond_best`。
 - 色彩系统：`paletteSets` 保存 4 组 5 色；当前版本固定使用第 1 组，颜色只服务于球体层次和底部目标槽可读性，不参与得分。
-- 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光、半球光和两盏聚光灯保证画面明亮。
+- 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光强度 1.28、半球光强度 0.55，两盏聚光灯提供方向阴影；`centerLight` 在 `(-0.15,-0.25,2.4)` 提供强度 2.35 的中心亮斑，`centerGlow` 使用 CanvasTexture + AdditiveBlending 在球群汇聚区叠加 2.9 world units 暖白光晕。
 - 多语言：`messages` 提供 zh/en 文案；`detectLocale()` 优先读取 `localStorage.game_locale`，再根据浏览器语言判断。
 - 音频：`tone()` 封装 OscillatorNode 和 GainNode；开始、换色、匹配收集、不匹配收集和结算都有短音效，音频解锁在用户手势后执行。
 
@@ -47,6 +47,6 @@
 - 调目标节奏：修改 `TARGET_SWITCH_INTERVAL` 和 `nextTargetSlot()` 的切换顺序。
 - 调局长：修改 `GAME_DURATION`。
 - 调物理手感：修改 world gravity、ContactMaterial restitution/friction、球体 damping、`resetBody()` 的初始位置。
-- 调亮度：修改 renderer clear color、scene background、AmbientLight、HemisphereLight 和两盏 SpotLight 强度。
+- 调亮度：修改 renderer clear color、scene background、AmbientLight、HemisphereLight、`centerLight`、`centerGlow` 和两盏 SpotLight 强度。
 - 换色盘：修改 `paletteSets`；每组 5 色，前三色会同时作为底部目标槽颜色。
 - 加平台接口：在 `endGame()` 接入 leaderboard/save；保留 `meta name="game-uuid"` 不变。
