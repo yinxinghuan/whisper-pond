@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as CANNON from 'cannon-es';
 
 const COUNT = 500;
+const GAME_DURATION = 60;
 const BEST_KEY = 'whisper_pond_best';
 const paletteSets = [
   ['#3b82f6', '#f43f5e', '#facc15', '#22c55e', '#f97316'],
@@ -14,36 +15,38 @@ const paletteSets = [
 
 const messages = {
   en: {
-    time: 'Bodies',
-    score: 'Palette',
+    time: 'Time',
+    score: 'Score',
     kicker: 'Bright cannon study',
     title: 'Physics Pond',
-    startCopy: 'Orbit the shelf and tap to cycle the falling sphere colors.',
+    startCopy: 'Orbit the shelf, cycle the colors, and let falling spheres score through the matching slots.',
     start: 'Begin',
-    hint: 'Drag orbit · Tap color',
-    complete: 'Physics study',
+    hint: 'Drag orbit · Tap color · Match the slots',
+    complete: 'Pond settled',
     best: 'Best',
-    stones: 'Bodies',
-    combo: 'Palette',
+    stones: 'Caught',
+    combo: 'Streak',
     again: 'Again',
     change: 'Color',
     home: 'Home',
+    settled: 'Matched colors settle deeper.',
   },
   zh: {
-    time: '小球',
-    score: '色盘',
+    time: '时间',
+    score: '得分',
     kicker: '明亮物理试验',
     title: '物理池',
-    startCopy: '旋转观察挡板，小球会按原版物理路径自然滚落。',
+    startCopy: '旋转观察挡板，切换色盘，让滚落的小球进入匹配颜色槽得分。',
     start: '开始',
-    hint: '拖动旋转 · 轻点换色',
-    complete: '物理试验',
+    hint: '拖动旋转 · 轻点换色 · 匹配色槽',
+    complete: '物理结算',
     best: '最高',
-    stones: '小球',
-    combo: '色盘',
+    stones: '收集',
+    combo: '连击',
     again: '再来一次',
     change: '换色',
     home: '返回首页',
+    settled: '颜色匹配时，落点更有意义。',
   },
 };
 
@@ -77,12 +80,21 @@ const stoneCount = document.getElementById('stoneCount');
 const bestCombo = document.getElementById('bestCombo');
 const finalThought = document.getElementById('finalThought');
 const comboBadge = document.getElementById('comboBadge');
+const slotHud = document.getElementById('slotHud');
+const slotHudItems = Array.from(slotHud.querySelectorAll('span'));
 const hint = document.getElementById('hint');
 
 let phase = 'start';
 let paletteIndex = 0;
 let pointerDownAt = 0;
 let pointerMoved = false;
+let score = 0;
+let collected = 0;
+let streak = 0;
+let bestStreak = 0;
+let remaining = GAME_DURATION;
+let lastCollectTone = 0;
+let comboTimer = 0;
 let audioCtx = null;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -180,6 +192,24 @@ for (let i = 0; i < 6; i += 1) {
   world.addBody(body);
 }
 
+const slotGeometry = new THREE.BoxGeometry(0.82, 0.1, 0.22);
+const collectionSlots = [-1.05, 0, 1.05].map((x) => {
+  const slot = new THREE.Mesh(
+    slotGeometry,
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.72,
+      depthTest: false,
+      depthWrite: false,
+    }),
+  );
+  slot.position.set(x, -5.9, 0.2);
+  slot.renderOrder = 5;
+  scene.add(slot);
+  return slot;
+});
+
 const bodies = Array.from({ length: COUNT }, (_, i) => {
   const scale = THREE.MathUtils.randFloat(0.2, 1);
   const body = new CANNON.Body({
@@ -191,7 +221,7 @@ const bodies = Array.from({ length: COUNT }, (_, i) => {
   });
   world.addBody(body);
   resetBody(body, i, false);
-  return { body, scale };
+  return { body, scale, colorIndex: i % 5 };
 });
 
 const dummy = new THREE.Object3D();
@@ -235,12 +265,25 @@ function playStart() {
   tone(620, 0.12, { delay: 0.06, gain: 0.03 });
 }
 
+function playCollect(match) {
+  const now = performance.now();
+  if (now - lastCollectTone < 80) return;
+  lastCollectTone = now;
+  if (match) tone(720, 0.08, { type: 'sine', freqEnd: 960, gain: 0.026 });
+  else tone(180, 0.07, { type: 'triangle', freqEnd: 150, gain: 0.018 });
+}
+
+function playEnd() {
+  tone(240, 0.18, { type: 'sine', freqEnd: 360, gain: 0.035 });
+}
+
 function setPhase(nextPhase) {
   phase = nextPhase;
   startScreen.classList.toggle('is-active', nextPhase === 'start');
   gameScreen.classList.toggle('is-active', nextPhase === 'playing');
   endScreen.classList.toggle('is-active', nextPhase === 'end');
   hud.classList.toggle('is-visible', nextPhase === 'playing');
+  slotHud.classList.toggle('is-visible', nextPhase === 'playing');
 }
 
 function resetBody(body, i, high = false) {
@@ -255,12 +298,15 @@ function resetBody(body, i, high = false) {
 function updateColors() {
   const palette = paletteSets[paletteIndex];
   for (let i = 0; i < COUNT; i += 1) {
-    color.set(palette[i % palette.length]);
+    color.set(palette[bodies[i].colorIndex % palette.length]);
     spheres.setColorAt(i, color);
   }
+  collectionSlots.forEach((slot, i) => {
+    slot.material.color.set(palette[i]);
+    slotHudItems[i].style.background = palette[i];
+    slotHudItems[i].style.boxShadow = `0 0 22px ${palette[i]}66`;
+  });
   if (spheres.instanceColor) spheres.instanceColor.needsUpdate = true;
-  bestCombo.textContent = String(paletteIndex + 1);
-  scoreValue.textContent = String(paletteIndex + 1);
 }
 
 function randomColors() {
@@ -269,12 +315,64 @@ function randomColors() {
   tone(660 + paletteIndex * 70, 0.1, { gain: 0.03 });
 }
 
+function updateHud() {
+  timeLeft.textContent = String(Math.max(0, Math.ceil(remaining)));
+  scoreValue.textContent = String(score);
+}
+
+function showCombo(text) {
+  comboBadge.textContent = text;
+  comboBadge.classList.add('is-visible');
+  window.clearTimeout(comboTimer);
+  comboTimer = window.setTimeout(() => comboBadge.classList.remove('is-visible'), 720);
+}
+
+function collectBall(ball) {
+  const { body, colorIndex } = ball;
+  const slotIndex = body.position.x < -0.55 ? 0 : body.position.x > 0.55 ? 2 : 1;
+  const match = colorIndex % paletteSets[paletteIndex].length === slotIndex;
+  score += match ? 3 : 1;
+  collected += 1;
+  if (match) {
+    streak += 1;
+    bestStreak = Math.max(bestStreak, streak);
+    if (streak > 0 && streak % 5 === 0) showCombo(`x${streak}`);
+  } else {
+    streak = 0;
+  }
+  playCollect(match);
+  updateHud();
+}
+
+function resetGameState() {
+  score = 0;
+  collected = 0;
+  streak = 0;
+  bestStreak = 0;
+  remaining = GAME_DURATION;
+  lastCollectTone = 0;
+  comboBadge.classList.remove('is-visible');
+  window.clearTimeout(comboTimer);
+  updateHud();
+}
+
+function endGame() {
+  if (phase !== 'playing') return;
+  setPhase('end');
+  playEnd();
+  const best = Math.max(Number(localStorage.getItem(BEST_KEY) || 0), score);
+  localStorage.setItem(BEST_KEY, String(best));
+  finalScore.textContent = String(score);
+  bestScore.textContent = String(best);
+  stoneCount.textContent = String(collected);
+  bestCombo.textContent = String(bestStreak);
+  finalThought.textContent = t('settled');
+}
+
 function startGame() {
   resumeAudio();
+  resetGameState();
   playStart();
-  scoreValue.textContent = String(paletteIndex + 1);
-  finalScore.textContent = String(COUNT);
-  stoneCount.textContent = String(COUNT);
   finalThought.textContent = '';
   hint.classList.remove('is-hidden');
   setPhase('playing');
@@ -283,8 +381,12 @@ function startGame() {
 
 function syncMeshes() {
   for (let i = 0; i < COUNT; i += 1) {
-    const { body, scale } = bodies[i];
-    if (body.position.y < -7) resetBody(body, i, true);
+    const ball = bodies[i];
+    const { body, scale } = ball;
+    if (body.position.y < -7) {
+      if (phase === 'playing') collectBall(ball);
+      resetBody(body, i, true);
+    }
     body.position.z = 0;
     body.velocity.z = 0;
     body.force.z = 0;
@@ -304,6 +406,11 @@ function render() {
   previousTime = now;
   world.step(1 / 60, dt, 3);
   syncMeshes();
+  if (phase === 'playing') {
+    remaining -= dt;
+    updateHud();
+    if (remaining <= 0) endGame();
+  }
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(render);
@@ -336,12 +443,14 @@ function onPointerUp() {
   if (!pointerMoved && elapsed < 430) randomColors();
 }
 
-timeLeft.textContent = String(COUNT);
-stoneCount.textContent = String(COUNT);
+timeLeft.textContent = String(GAME_DURATION);
+stoneCount.textContent = '0';
 bestScore.textContent = localStorage.getItem(BEST_KEY) || '0';
-bestCombo.textContent = '1';
+bestCombo.textContent = '0';
+finalScore.textContent = '0';
 finalThought.textContent = '';
 updateColors();
+updateHud();
 setPhase('start');
 resize();
 requestAnimationFrame(render);

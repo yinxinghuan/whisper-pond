@@ -294,6 +294,32 @@ h2 {
   transform: translateX(-50%) translateY(0);
 }
 
+.wp-slots {
+  position: absolute;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 12;
+  width: min(224px, 58vw);
+  height: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  transform: translateX(-50%) translateY(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.wp-slots.is-visible {
+  opacity: 0.9;
+  transform: translateX(-50%) translateY(0);
+}
+
+.wp-slots span {
+  border-radius: 999px;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.42);
+}
+
 .wp-watermark {
   position: absolute;
   right: 14px;
