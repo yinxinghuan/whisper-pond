@@ -10,6 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/gif" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
     <title>Physics Pond</title>
+    <script src="./aigram-bridge.js"></script>
   </head>
   <body>
     <div id="app" class="wp-shell">
@@ -73,6 +74,23 @@
           </div>
         </section>
       </main>
+
+      <button id="leaderboardButton" class="wp-rank-button" type="button" aria-label="Leaderboard" hidden>🏆</button>
+
+      <div id="leaderboardModal" class="wp-leaderboard" hidden>
+        <div class="wp-leaderboard__panel" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitle">
+          <header class="wp-leaderboard__head">
+            <div>
+              <div id="leaderboardTitle" class="wp-leaderboard__title" data-i18n="leaderboardTitle">Leaderboard</div>
+              <div class="wp-leaderboard__game">Physics Pond</div>
+            </div>
+            <button id="leaderboardClose" class="wp-leaderboard__close" type="button" aria-label="Close">×</button>
+          </header>
+          <div id="leaderboardBody" class="wp-leaderboard__body">
+            <div class="wp-leaderboard__state" data-i18n="leaderboardLoading">Loading…</div>
+          </div>
+        </div>
+      </div>
 
       <img class="wp-watermark" src="./img/aigram.svg" alt="" draggable="false" />
     </div>

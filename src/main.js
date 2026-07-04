@@ -52,6 +52,11 @@ const messages = {
     targetLeft: 'LEFT',
     targetCenter: 'CENTER',
     targetRight: 'RIGHT',
+    leaderboardTitle: 'Leaderboard',
+    leaderboardLoading: 'Loading...',
+    leaderboardEmpty: 'No scores yet.',
+    leaderboardOpenInApp: 'Open in AlterU to view rankings.',
+    leaderboardYou: 'YOU',
   },
   zh: {
     time: '时间',
@@ -78,6 +83,11 @@ const messages = {
     targetLeft: '左槽',
     targetCenter: '中槽',
     targetRight: '右槽',
+    leaderboardTitle: '排行榜',
+    leaderboardLoading: '加载中...',
+    leaderboardEmpty: '还没有成绩。',
+    leaderboardOpenInApp: '在 AlterU 内打开即可查看排行榜。',
+    leaderboardYou: '你',
   },
 };
 
@@ -126,6 +136,10 @@ const slotHudItems = Array.from(slotHud.querySelectorAll('span'));
 const slotLabels = document.getElementById('slotLabels');
 const slotLabelItems = Array.from(slotLabels.querySelectorAll('span'));
 const hint = document.getElementById('hint');
+const leaderboardButton = document.getElementById('leaderboardButton');
+const leaderboardModal = document.getElementById('leaderboardModal');
+const leaderboardClose = document.getElementById('leaderboardClose');
+const leaderboardBody = document.getElementById('leaderboardBody');
 
 let phase = 'start';
 let paletteIndex = 0;
@@ -147,6 +161,10 @@ let activeRamp = null;
 let selectedRampIndex = 2;
 let dragStartX = 0;
 let dragStartAngle = 0;
+
+const Aigram = window.Aigram || {};
+const canRank = Boolean(Aigram.canRank && Aigram.gameUuid);
+if (canRank) leaderboardButton.hidden = false;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -379,6 +397,114 @@ function playEnd() {
   tone(240, 0.18, { type: 'sine', freqEnd: 360, gain: 0.035 });
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[char]);
+}
+
+async function submitLeaderboardScore(finalValue) {
+  if (!canRank || finalValue <= 0) return;
+  try {
+    await Aigram.callAigramAPI('/note/aigram/ai/game/rank/score/save', 'POST', {
+      session_id: Aigram.gameUuid,
+      score: Math.floor(finalValue),
+    });
+  } catch {}
+}
+
+async function fetchLeaderboard() {
+  if (!canRank) return [];
+  try {
+    const response = await Aigram.callAigramAPI(
+      `/note/aigram/ai/game/rank/score/list/by/session_id?session_id=${encodeURIComponent(Aigram.gameUuid)}`,
+      'GET',
+    );
+    const rows = Array.isArray(response) ? response : response?.data || [];
+    return rows.map((row, index) => ({
+      userId: String(row.user_id || ''),
+      name: row.user_name || row.name || '',
+      avatarUrl: row.head_url || '',
+      score: Number(row.score) || 0,
+      rank: Number(row.rank) || index + 1,
+      isMe: String(row.user_id || '') === String(Aigram.telegramId || ''),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function renderLeaderboardState(text) {
+  leaderboardBody.innerHTML = `<div class="wp-leaderboard__state">${escapeHtml(text)}</div>`;
+}
+
+function renderLeaderboardRows(entries) {
+  if (!entries.length) {
+    renderLeaderboardState(canRank ? t('leaderboardEmpty') : t('leaderboardOpenInApp'));
+    return;
+  }
+  leaderboardBody.innerHTML = '';
+  entries.forEach((entry, index) => {
+    const row = document.createElement(entry.isMe ? 'div' : 'button');
+    row.className = `wp-rank-row${index < 3 ? ' wp-rank-row--top' : ''}${entry.isMe ? ' wp-rank-row--me' : ''}`;
+    if (!entry.isMe) {
+      row.type = 'button';
+      row.addEventListener('click', () => {
+        if (Aigram.isInAigram && entry.userId) Aigram.openAigramProfile(entry.userId);
+      });
+    }
+
+    const rank = document.createElement('span');
+    rank.className = 'wp-rank-row__rank';
+    rank.textContent = index === 0 ? '1' : index === 1 ? '2' : index === 2 ? '3' : String(entry.rank);
+
+    const name = document.createElement('span');
+    name.className = 'wp-rank-row__name';
+    name.textContent = entry.isMe ? t('leaderboardYou') : entry.name || '...';
+
+    const value = document.createElement('strong');
+    value.className = 'wp-rank-row__score';
+    value.textContent = entry.score.toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US');
+
+    row.appendChild(rank);
+    if (!entry.isMe) {
+      const avatar = document.createElement('span');
+      avatar.className = 'wp-rank-row__avatar';
+      if (entry.avatarUrl) {
+        const image = document.createElement('img');
+        image.src = entry.avatarUrl;
+        image.alt = '';
+        image.draggable = false;
+        image.onerror = () => {
+          avatar.textContent = (entry.name || '?').charAt(0).toUpperCase();
+        };
+        avatar.appendChild(image);
+      } else {
+        avatar.textContent = (entry.name || '?').charAt(0).toUpperCase();
+      }
+      row.appendChild(avatar);
+    }
+    row.append(name, value);
+    leaderboardBody.appendChild(row);
+  });
+}
+
+async function showLeaderboard() {
+  if (!canRank) return;
+  leaderboardModal.hidden = false;
+  renderLeaderboardState(t('leaderboardLoading'));
+  const entries = await fetchLeaderboard();
+  renderLeaderboardRows(entries);
+}
+
+function hideLeaderboard() {
+  leaderboardModal.hidden = true;
+}
+
 function setPhase(nextPhase) {
   phase = nextPhase;
   startScreen.classList.toggle('is-active', nextPhase === 'start');
@@ -584,6 +710,7 @@ function endGame(won = false) {
   playEnd();
   const best = Math.max(Number(localStorage.getItem(BEST_KEY) || 0), score);
   localStorage.setItem(BEST_KEY, String(best));
+  submitLeaderboardScore(score);
   resultLabel.textContent = t(won ? 'complete' : 'missed');
   finalScore.textContent = String(score);
   bestScore.textContent = String(best);
@@ -734,6 +861,17 @@ changeButton.addEventListener('pointerdown', (event) => {
 homeButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
   setPhase('start');
+});
+leaderboardButton.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  showLeaderboard();
+});
+leaderboardClose.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  hideLeaderboard();
+});
+leaderboardModal.addEventListener('pointerdown', (event) => {
+  if (event.target === leaderboardModal) hideLeaderboard();
 });
 gameScreen.addEventListener('pointerdown', onPointerDown, { passive: false });
 window.addEventListener('pointermove', onPointerMove, { passive: false });

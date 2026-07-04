@@ -8,13 +8,15 @@
 - 物理：cannon-es World、Sphere、Box、SAPBroadphase、ContactMaterial。
 - 输入：Pointer Events、Keyboard Events、Raycaster 固定平面拾取。
 - 存储：`localStorage.whisper_pond_best` 保存最高分。
+- 平台：`public/aigram-bridge.js` 暴露 `window.Aigram`，用于 Aigram 内提交和读取排行榜。
 - 音频：Web Audio API 实时合成。
 
 ## 2. 目录结构
 
 - `index.html`：游戏根 DOM、WebGL stage、HUD、关卡徽章、目标说明面板、底部目标槽提示、开始/游戏/结算三态容器、UUID meta、Aigram 水印。
-- `src/main.js`：Three.js 场景、Cannon 物理世界、5 关配置、球体/可拖动挡板/目标槽、目标说明文案、计时计分、手机操作、音频和状态切换。
-- `src/styles.css`：明亮舞台、HUD、关卡徽章、目标说明面板、底部三色槽和文字标签、玻璃卡片、combo 徽章、按钮、中文/英文字体排版分支、底部提示和桌面 390px × 680px 容器。
+- `src/main.js`：Three.js 场景、Cannon 物理世界、5 关配置、球体/可拖动挡板/目标槽、目标说明文案、计时计分、排行榜、手机操作、音频和状态切换。
+- `src/styles.css`：明亮舞台、HUD、关卡徽章、目标说明面板、底部三色槽和文字标签、排行榜按钮/弹层、玻璃卡片、combo 徽章、按钮、中文/英文字体排版分支、底部提示和桌面 390px × 680px 容器。
+- `public/aigram-bridge.js`：vanilla Aigram 平台桥，支持 `callAigramAPI()`、`postAigramAPI()` 和 `openAigramProfile()`。
 - `public/img/aigram.svg`：右下角单色平台水印。
 - `doc/requirements.md`：玩法和视觉需求。
 - `doc/technical.md`：当前实现说明。
@@ -34,6 +36,7 @@
 - 目标槽：`targetSlot` 由当前关卡固定指定；`updateColors()` 同步场景槽透明度、scale、底部 HUD 高亮和槽位文字标签；`levelBadge` 显示关卡序号和目标槽，`objectivePanel` 显示目标槽、剩余命中数和可拖动挡板数量。
 - 收集与计分：`syncMeshes()` 检测 `body.position.y < -7` 后先调用 `collectBall()`，再 `resetBody(body, i, true)`；`collectBall()` 根据 x 坐标分配收集槽，命中 `targetSlot` 得 5 分、`levelHits + 1` 并增加 streak，否则得 1 分并清空 streak。
 - 计时与结算：每关 `remaining` 使用当前 `LEVELS[n].time`；`levelHits >= goal` 后进入下一关，第 5 关完成则通关；时间归零未达目标则失败结算；`endGame()` 写入最终分数、最高分、收集数和最高 streak，并更新 `localStorage.whisper_pond_best`。
+- 排行榜：`canRank` 来自 `window.Aigram.canRank && window.Aigram.gameUuid`；仅 Aigram 内显示 `leaderboardButton`。`endGame()` 调用 `submitLeaderboardScore(score)` 写入 `/note/aigram/ai/game/rank/score/save`，`showLeaderboard()` 调用 `/note/aigram/ai/game/rank/score/list/by/session_id` 拉榜，并渲染头像、用户名、分数和可点击用户主页。
 - 色彩系统：`paletteSets` 保存 4 组 5 色；当前版本固定使用第 1 组，颜色只服务于球体层次和底部目标槽可读性，不参与得分。
 - 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光强度 1.28、半球光强度 0.55，两盏聚光灯提供方向阴影；`centerLight` 在 `(-0.15,-0.25,2.4)` 提供强度 1.55、距离 7.2、decay 1.3 的宽中心光，`centerGlow` 使用 CanvasTexture + AdditiveBlending 在球群汇聚区叠加 4.6 world units 暖白光晕，材质 opacity 为 0.5。
 - 多语言与排版：`messages` 提供 zh/en 文案；`detectLocale()` 优先读取 `localStorage.game_locale`，再根据浏览器语言判断；运行时写入 `document.documentElement.lang` 和 `body[data-locale]`，CSS 使用中文分支取消过大的英文字距并切换到 `"PingFang SC"` 等中文字体栈。
@@ -50,4 +53,4 @@
 - 调 UI 说明：修改 `index.html` 的 `objectivePanel` / `slotLabels` 结构、`src/main.js` 的 `objectiveTitle` / `objectiveDetail` / `targetMark` 文案，以及 `src/styles.css` 中 `.wp-objective`、`.wp-slot-labels` 和 `body[data-locale="zh"]` 样式。
 - 调亮度：修改 renderer clear color、scene background、AmbientLight、HemisphereLight、`centerLight`、`centerGlow` 和两盏 SpotLight 强度。
 - 换色盘：修改 `paletteSets`；每组 5 色，前三色会同时作为底部目标槽颜色。
-- 加平台接口：在 `endGame()` 接入 leaderboard/save；保留 `meta name="game-uuid"` 不变。
+- 加平台接口：排行榜已通过 `public/aigram-bridge.js` 接入；后续加存档或事件统计时继续保留 `meta name="game-uuid"` 不变，并使用同一个 `window.Aigram.gameUuid`。
