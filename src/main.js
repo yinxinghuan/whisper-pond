@@ -3,56 +3,72 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 
 const COUNT = 500;
-const GAME_DURATION = 60;
-const TARGET_SWITCH_INTERVAL = 12;
 const RAMP_MIN_ANGLE = -THREE.MathUtils.degToRad(42);
 const RAMP_MAX_ANGLE = THREE.MathUtils.degToRad(42);
 const RAMP_DRAG_SENSITIVITY = 0.42;
 const BEST_KEY = 'whisper_pond_best';
+const deg = THREE.MathUtils.degToRad;
 const paletteSets = [
   ['#3b82f6', '#f43f5e', '#facc15', '#22c55e', '#f97316'],
   ['#14b8a6', '#fb7185', '#8b5cf6', '#fbbf24', '#38bdf8'],
   ['#06b6d4', '#84cc16', '#f472b6', '#fde047', '#f87171'],
   ['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#a855f7'],
 ];
+const LEVELS = [
+  { time: 36, target: 1, goal: 12, angles: [30, -30, 30, -30, 30, -30], movable: [2, 3, 4] },
+  { time: 40, target: 0, goal: 16, angles: [28, -34, 18, -40, 32, -26], movable: [1, 2, 4] },
+  { time: 44, target: 2, goal: 20, angles: [38, -18, 34, -24, 12, -38], movable: [0, 3, 5] },
+  { time: 48, target: 1, goal: 24, angles: [42, -8, 14, -42, 34, -16], movable: [0, 1, 3, 4] },
+  { time: 52, target: 0, goal: 28, angles: [16, -42, 40, -10, 8, -34], movable: [0, 2, 3, 5] },
+].map((level) => ({
+  ...level,
+  angles: level.angles.map(deg),
+  movable: new Set(level.movable),
+}));
 
 const messages = {
   en: {
     time: 'Time',
-    score: 'Score',
-    kicker: 'Bright cannon study',
+    score: 'Goal',
+    kicker: 'Five plank puzzles',
     title: 'Physics Pond',
-    startCopy: 'Drag the planks to steer falling spheres into the glowing target slot.',
+    startCopy: 'Solve five plank layouts by steering enough spheres into the glowing slot.',
     start: 'Begin',
-    hint: 'Drag planks · Feed the glowing slot',
+    hint: 'Drag bright planks · Fill the goal',
     complete: 'Pond settled',
+    missed: 'Level missed',
     best: 'Best',
     stones: 'Caught',
     combo: 'Streak',
     again: 'Again',
-    change: 'Target',
+    change: 'Retry',
     home: 'Home',
-    settled: 'The best paths are built by small plank moves.',
+    settled: 'All five paths held.',
+    missedThought: 'Adjust the bright planks and try this layout again.',
+    level: 'LEVEL',
     targetLeft: 'LEFT',
     targetCenter: 'CENTER',
     targetRight: 'RIGHT',
   },
   zh: {
     time: '时间',
-    score: '得分',
-    kicker: '明亮物理试验',
+    score: '目标',
+    kicker: '五个挡板谜题',
     title: '物理池',
-    startCopy: '拖动挡板改变角度，把滚落的小球导入发光目标槽。',
+    startCopy: '解开五个挡板布局，把足够多小球导入发光槽。',
     start: '开始',
-    hint: '拖动挡板 · 导入发光槽',
+    hint: '拖动亮挡板 · 填满目标',
     complete: '物理结算',
+    missed: '关卡未完成',
     best: '最高',
     stones: '收集',
     combo: '连击',
     again: '再来一次',
-    change: '换目标',
+    change: '重试本关',
     home: '返回首页',
-    settled: '好路径来自几次很小的挡板调整。',
+    settled: '五条路径都稳住了。',
+    missedThought: '调整亮起的挡板，再试一次这个布局。',
+    level: '关卡',
     targetLeft: '左槽',
     targetCenter: '中槽',
     targetRight: '右槽',
@@ -84,27 +100,32 @@ const homeButton = document.getElementById('homeButton');
 const timeLeft = document.getElementById('timeLeft');
 const scoreValue = document.getElementById('scoreValue');
 const finalScore = document.getElementById('finalScore');
+const resultLabel = document.getElementById('resultLabel');
 const bestScore = document.getElementById('bestScore');
 const stoneCount = document.getElementById('stoneCount');
 const bestCombo = document.getElementById('bestCombo');
 const finalThought = document.getElementById('finalThought');
 const comboBadge = document.getElementById('comboBadge');
+const levelBadge = document.getElementById('levelBadge');
 const slotHud = document.getElementById('slotHud');
 const slotHudItems = Array.from(slotHud.querySelectorAll('span'));
 const hint = document.getElementById('hint');
 
 let phase = 'start';
 let paletteIndex = 0;
+let currentLevel = 0;
+let levelHits = 0;
 let score = 0;
 let collected = 0;
 let streak = 0;
 let bestStreak = 0;
-let remaining = GAME_DURATION;
+let remaining = LEVELS[0].time;
 let targetSlot = 1;
-let targetTimer = TARGET_SWITCH_INTERVAL;
 let lastCollectTone = 0;
 let lastDragTone = 0;
 let comboTimer = 0;
+let levelCompletePending = false;
+let gameWon = false;
 let audioCtx = null;
 let activeRamp = null;
 let selectedRampIndex = 2;
@@ -235,7 +256,7 @@ for (let i = 0; i < 6; i += 1) {
   body.position.set(x, y, 0);
   body.quaternion.setFromEuler(0, 0, angle);
   world.addBody(body);
-  ramps.push({ mesh: ramp, body, angle, startAngle: angle });
+  ramps.push({ mesh: ramp, body, angle, startAngle: angle, locked: false });
 }
 
 const slotGeometry = new THREE.BoxGeometry(0.82, 0.1, 0.22);
@@ -327,6 +348,10 @@ function playTarget() {
   tone(560, 0.11, { type: 'sine', freqEnd: 760, gain: 0.028 });
 }
 
+function playLevelClear() {
+  [520, 660, 880, 1174].forEach((freq, i) => tone(freq, 0.09, { type: 'sine', gain: 0.026, delay: i * 0.055 }));
+}
+
 function playDrag() {
   const now = performance.now();
   if (now - lastDragTone < 180) return;
@@ -365,10 +390,12 @@ function applyRampAngle(ramp, angle) {
 
 function updateRampHighlights() {
   ramps.forEach((ramp, i) => {
-    const isSelected = i === selectedRampIndex;
-    ramp.mesh.material.color.set(isSelected ? 0xd8d3c5 : 0xaaaaaa);
-    ramp.mesh.material.emissive.set(isSelected ? 0x262018 : 0x000000);
-    ramp.mesh.material.emissiveIntensity = isSelected ? 0.35 : 0;
+    const isSelected = i === selectedRampIndex && !ramp.locked;
+    ramp.mesh.material.color.set(ramp.locked ? 0x8f8a80 : isSelected ? 0xded8c8 : 0xaaaaaa);
+    ramp.mesh.material.emissive.set(isSelected ? 0x372914 : 0x000000);
+    ramp.mesh.material.emissiveIntensity = isSelected ? 0.42 : 0;
+    ramp.mesh.material.opacity = ramp.locked ? 0.62 : 1;
+    ramp.mesh.material.transparent = ramp.locked;
   });
 }
 
@@ -385,6 +412,7 @@ function findRampAt(point) {
   let bestScore = Infinity;
   for (let i = 0; i < ramps.length; i += 1) {
     const ramp = ramps[i];
+    if (ramp.locked) continue;
     const local = ramp.mesh.worldToLocal(point.clone());
     const inside = Math.abs(local.x) <= 1.8 && Math.abs(local.y) <= 0.58;
     const score = Math.abs(local.y) * 2.4 + Math.max(0, Math.abs(local.x) - 1.45);
@@ -418,6 +446,14 @@ function targetLabel() {
   return [t('targetLeft'), t('targetCenter'), t('targetRight')][targetSlot];
 }
 
+function currentGoal() {
+  return LEVELS[currentLevel].goal;
+}
+
+function updateLevelBadge() {
+  levelBadge.textContent = `${t('level')} ${currentLevel + 1}/${LEVELS.length} · ${targetLabel()}`;
+}
+
 function showStatus(text) {
   comboBadge.textContent = text;
   comboBadge.classList.add('is-visible');
@@ -427,26 +463,17 @@ function showStatus(text) {
 
 function setTargetSlot(nextTarget, announce = true) {
   targetSlot = ((nextTarget % 3) + 3) % 3;
-  targetTimer = TARGET_SWITCH_INTERVAL;
   updateColors();
+  updateLevelBadge();
   if (announce) {
     showStatus(targetLabel());
     playTarget();
   }
 }
 
-function nextTargetSlot() {
-  setTargetSlot(targetSlot + 1);
-}
-
-function updateTargetTimer(dt) {
-  targetTimer -= dt;
-  if (targetTimer <= 0) nextTargetSlot();
-}
-
 function updateHud() {
   timeLeft.textContent = String(Math.max(0, Math.ceil(remaining)));
-  scoreValue.textContent = String(score);
+  scoreValue.textContent = `${levelHits}/${currentGoal()}`;
 }
 
 function showCombo(text) {
@@ -460,9 +487,11 @@ function collectBall(ball) {
   score += match ? 5 : 1;
   collected += 1;
   if (match) {
+    levelHits += 1;
     streak += 1;
     bestStreak = Math.max(bestStreak, streak);
     if (streak > 0 && streak % 5 === 0) showCombo(`x${streak}`);
+    if (levelHits >= currentGoal()) levelCompletePending = true;
   } else {
     streak = 0;
   }
@@ -470,37 +499,75 @@ function collectBall(ball) {
   updateHud();
 }
 
+function firstMovableIndex(level) {
+  for (let i = 0; i < ramps.length; i += 1) {
+    if (level.movable.has(i)) return i;
+  }
+  return 0;
+}
+
+function applyLevel(levelIndex, resetBalls = true, announce = true) {
+  currentLevel = THREE.MathUtils.clamp(levelIndex, 0, LEVELS.length - 1);
+  const level = LEVELS[currentLevel];
+  levelHits = 0;
+  remaining = level.time;
+  targetSlot = level.target;
+  levelCompletePending = false;
+  activeRamp = null;
+  selectedRampIndex = firstMovableIndex(level);
+  comboBadge.classList.remove('is-visible');
+  window.clearTimeout(comboTimer);
+  ramps.forEach((ramp, i) => {
+    ramp.locked = !level.movable.has(i);
+    applyRampAngle(ramp, level.angles[i]);
+  });
+  updateRampHighlights();
+  updateColors();
+  updateLevelBadge();
+  updateHud();
+  if (resetBalls) {
+    for (let i = 0; i < COUNT; i += 1) resetBody(bodies[i].body, i, false);
+  }
+  if (announce) showStatus(`${t('level')} ${currentLevel + 1} · ${targetLabel()}`);
+}
+
 function resetGameState() {
   score = 0;
   collected = 0;
   streak = 0;
   bestStreak = 0;
-  remaining = GAME_DURATION;
-  targetSlot = 1;
-  targetTimer = TARGET_SWITCH_INTERVAL;
+  gameWon = false;
   lastCollectTone = 0;
   lastDragTone = 0;
-  activeRamp = null;
-  selectedRampIndex = 2;
-  comboBadge.classList.remove('is-visible');
-  window.clearTimeout(comboTimer);
-  ramps.forEach((ramp) => applyRampAngle(ramp, ramp.startAngle));
-  updateRampHighlights();
-  updateColors();
-  updateHud();
+  applyLevel(0, false, false);
 }
 
-function endGame() {
+function endGame(won = false) {
   if (phase !== 'playing') return;
+  gameWon = won;
   setPhase('end');
   playEnd();
   const best = Math.max(Number(localStorage.getItem(BEST_KEY) || 0), score);
   localStorage.setItem(BEST_KEY, String(best));
+  resultLabel.textContent = t(won ? 'complete' : 'missed');
   finalScore.textContent = String(score);
   bestScore.textContent = String(best);
   stoneCount.textContent = String(collected);
   bestCombo.textContent = String(bestStreak);
-  finalThought.textContent = t('settled');
+  finalThought.textContent = t(won ? 'settled' : 'missedThought');
+  changeButton.hidden = won;
+}
+
+function completeLevel() {
+  if (phase !== 'playing') return;
+  levelCompletePending = false;
+  playLevelClear();
+  score += 20 + currentLevel * 10;
+  if (currentLevel >= LEVELS.length - 1) {
+    endGame(true);
+    return;
+  }
+  applyLevel(currentLevel + 1, true, true);
 }
 
 function startGame() {
@@ -508,10 +575,23 @@ function startGame() {
   resetGameState();
   playStart();
   finalThought.textContent = '';
+  resultLabel.textContent = t('complete');
+  changeButton.hidden = false;
   hint.classList.remove('is-hidden');
   setPhase('playing');
   for (let i = 0; i < COUNT; i += 1) resetBody(bodies[i].body, i, false);
-  showStatus(targetLabel());
+  showStatus(`${t('level')} ${currentLevel + 1} · ${targetLabel()}`);
+}
+
+function retryCurrentLevel() {
+  resumeAudio();
+  if (phase === 'end') {
+    streak = 0;
+    setPhase('playing');
+  }
+  finalThought.textContent = '';
+  hint.classList.remove('is-hidden');
+  applyLevel(currentLevel, true, true);
 }
 
 function syncMeshes() {
@@ -542,8 +622,8 @@ function render() {
   world.step(1 / 60, dt, 3);
   syncMeshes();
   if (phase === 'playing') {
+    if (levelCompletePending) completeLevel();
     remaining -= dt;
-    updateTargetTimer(dt);
     updateHud();
     if (remaining <= 0) endGame();
   }
@@ -591,7 +671,7 @@ function onPointerUp(event) {
   gameScreen.releasePointerCapture?.(event.pointerId);
 }
 
-timeLeft.textContent = String(GAME_DURATION);
+timeLeft.textContent = String(LEVELS[0].time);
 stoneCount.textContent = '0';
 bestScore.textContent = localStorage.getItem(BEST_KEY) || '0';
 bestCombo.textContent = '0';
@@ -614,7 +694,7 @@ againButton.addEventListener('pointerdown', (event) => {
 });
 changeButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
-  nextTargetSlot();
+  retryCurrentLevel();
 });
 homeButton.addEventListener('pointerdown', (event) => {
   event.preventDefault();
@@ -632,12 +712,20 @@ window.addEventListener('keydown', (event) => {
   }
   if (event.code === 'Tab') {
     event.preventDefault();
-    selectedRampIndex = (selectedRampIndex + 1) % ramps.length;
+    const level = LEVELS[currentLevel];
+    for (let step = 1; step <= ramps.length; step += 1) {
+      const next = (selectedRampIndex + step) % ramps.length;
+      if (level.movable.has(next)) {
+        selectedRampIndex = next;
+        break;
+      }
+    }
     updateRampHighlights();
   }
   if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
     event.preventDefault();
     const ramp = ramps[selectedRampIndex];
+    if (ramp.locked) return;
     const delta = THREE.MathUtils.degToRad(event.code === 'ArrowLeft' ? -4 : 4);
     applyRampAngle(ramp, ramp.angle + delta);
     playDrag();

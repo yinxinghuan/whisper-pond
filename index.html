@@ -22,7 +22,7 @@
           <strong id="timeLeft">500</strong>
         </div>
         <div class="wp-hud__score">
-          <span data-i18n="score">Palette</span>
+          <span data-i18n="score">Goal</span>
           <strong id="scoreValue">0</strong>
         </div>
       </header>
@@ -37,6 +37,7 @@
       </main>
 
       <main id="gameScreen" class="wp-screen wp-screen--game" aria-live="polite">
+        <div id="levelBadge" class="wp-level-badge">LEVEL 1/5</div>
         <div id="comboBadge" class="wp-combo" aria-hidden="true"></div>
         <div id="slotHud" class="wp-slots" aria-hidden="true">
           <span></span>
@@ -48,17 +49,17 @@
 
       <main id="endScreen" class="wp-screen wp-screen--end">
         <section class="wp-end-card">
-          <div class="wp-kicker" data-i18n="complete">Physics study</div>
+          <div id="resultLabel" class="wp-kicker" data-i18n="complete">Pond settled</div>
           <h2 id="finalScore">0</h2>
           <div class="wp-stats">
             <div><span data-i18n="best">Best</span><strong id="bestScore">0</strong></div>
             <div><span data-i18n="stones">Bodies</span><strong id="stoneCount">0</strong></div>
-            <div><span data-i18n="combo">Palette</span><strong id="bestCombo">1</strong></div>
+            <div><span data-i18n="combo">Streak</span><strong id="bestCombo">1</strong></div>
           </div>
           <p id="finalThought" class="wp-final-thought"></p>
           <div class="wp-actions">
             <button id="againButton" class="wp-button wp-button--primary" type="button" data-i18n="again">Again</button>
-            <button id="changeButton" class="wp-button" type="button" data-i18n="change">Target</button>
+            <button id="changeButton" class="wp-button" type="button" data-i18n="change">Retry</button>
             <button id="homeButton" class="wp-button" type="button" data-i18n="home">Home</button>
           </div>
         </section>

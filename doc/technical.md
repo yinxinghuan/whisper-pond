@@ -12,9 +12,9 @@
 
 ## 2. 目录结构
 
-- `index.html`：游戏根 DOM、WebGL stage、HUD、底部目标槽提示、开始/游戏/结算三态容器、UUID meta、Aigram 水印。
-- `src/main.js`：Three.js 场景、Cannon 物理世界、球体/可拖动挡板/目标槽、计时计分、手机操作、音频和状态切换。
-- `src/styles.css`：明亮舞台、HUD、底部三色槽、玻璃卡片、combo 徽章、按钮、底部提示和桌面 390px × 680px 容器。
+- `index.html`：游戏根 DOM、WebGL stage、HUD、关卡徽章、底部目标槽提示、开始/游戏/结算三态容器、UUID meta、Aigram 水印。
+- `src/main.js`：Three.js 场景、Cannon 物理世界、5 关配置、球体/可拖动挡板/目标槽、计时计分、手机操作、音频和状态切换。
+- `src/styles.css`：明亮舞台、HUD、关卡徽章、底部三色槽、玻璃卡片、combo 徽章、按钮、底部提示和桌面 390px × 680px 容器。
 - `public/img/aigram.svg`：右下角单色平台水印。
 - `doc/requirements.md`：玩法和视觉需求。
 - `doc/technical.md`：当前实现说明。
@@ -22,17 +22,18 @@
 
 ## 3. 核心模块
 
-- 状态管理与主循环：`phase` 控制 start/playing/end 三态；`requestAnimationFrame(render)` 每帧执行 Cannon `world.step()`、`syncMeshes()`、目标槽计时、倒计时和 `renderer.render()`。
+- 状态管理与主循环：`phase` 控制 start/playing/end 三态；`requestAnimationFrame(render)` 每帧执行 Cannon `world.step()`、`syncMeshes()`、关卡完成检测、倒计时和 `renderer.render()`。
 - 屏幕适配：`resize()` 根据 `stage.clientWidth/clientHeight` 更新 renderer pixel ratio、canvas size 和 camera aspect；CSS 在桌面端固定 390px × 680px，移动端全屏。
 - 固定相机：相机位置为 `(0,0,7)` 并 `lookAt(0,-0.3,0)`；不使用 OrbitControls，游戏中没有旋转、缩放或平移。
 - 物理世界：`world.gravity` 为 `(0,-9.82,0)`，`SAPBroadphase` 加速碰撞，默认 ContactMaterial 设置 friction=0.08、restitution=0.38。
 - 球体系统：`bodies` 保存 500 个 Cannon Sphere body、scale 和 colorIndex；Three.js 端用一个 `InstancedMesh` 批量渲染 500 个球体，球几何补全白色 vertex color，并用 instance color 控制调色盘。
 - 防漏球约束：每帧在 `syncMeshes()` 中强制 `body.position.z=0`、`body.velocity.z=0`、`body.force.z=0`；挡板碰撞体 z halfExtent 为 0.1；动态 InstancedMesh 关闭 `frustumCulled`，避免主相机只看见阴影。
-- 挡板系统：6 个 Three.js Box mesh 与 6 个 mass=0 Cannon Box body 使用相同位置和 z 旋转；初始右侧挡板角度为 `+Math.PI / 6`，左侧挡板角度为 `-Math.PI / 6`，`applyRampAngle()` 将拖动后的角度限制在 -42° 到 +42° 并同步 mesh/body quaternion。
-- 挡板拾取：`projectPointerToPlane()` 用 Raycaster 把触点投射到 z=0 平面；`findRampAt()` 把点转换到每条挡板本地坐标，选中最近挡板；拖动横向位移乘以 0.42 rad/world unit 后更新角度。
-- 目标槽：`targetSlot` 在左/中/右三槽间循环，默认中槽；`updateTargetTimer()` 每 12 秒调用 `nextTargetSlot()`；`updateColors()` 同步场景槽透明度、scale 和底部 HUD 高亮。
-- 收集与计分：`syncMeshes()` 检测 `body.position.y < -7` 后先调用 `collectBall()`，再 `resetBody(body, i, true)`；`collectBall()` 根据 x 坐标分配收集槽，命中 `targetSlot` 得 5 分并增加 streak，否则得 1 分并清空 streak。
-- 计时与结算：`remaining` 从 60 秒递减；`endGame()` 写入最终分数、最高分、收集数和最高 streak，并更新 `localStorage.whisper_pond_best`。
+- 关卡系统：`LEVELS` 定义 5 关的时间、目标槽、目标命中数、6 条挡板初始角度和可移动挡板编号；`applyLevel()` 切换关卡、重置命中数、设置锁定挡板和 HUD。
+- 挡板系统：6 个 Three.js Box mesh 与 6 个 mass=0 Cannon Box body 使用相同位置和 z 旋转；`applyRampAngle()` 将拖动后的角度限制在 -42° 到 +42° 并同步 mesh/body quaternion；锁定挡板透明度为 0.62 且跳过拾取。
+- 挡板拾取：`projectPointerToPlane()` 用 Raycaster 把触点投射到 z=0 平面；`findRampAt()` 把点转换到每条可动挡板本地坐标，选中最近挡板；拖动横向位移乘以 0.42 rad/world unit 后更新角度。
+- 目标槽：`targetSlot` 由当前关卡固定指定；`updateColors()` 同步场景槽透明度、scale 和底部 HUD 高亮；`levelBadge` 显示关卡序号和目标槽。
+- 收集与计分：`syncMeshes()` 检测 `body.position.y < -7` 后先调用 `collectBall()`，再 `resetBody(body, i, true)`；`collectBall()` 根据 x 坐标分配收集槽，命中 `targetSlot` 得 5 分、`levelHits + 1` 并增加 streak，否则得 1 分并清空 streak。
+- 计时与结算：每关 `remaining` 使用当前 `LEVELS[n].time`；`levelHits >= goal` 后进入下一关，第 5 关完成则通关；时间归零未达目标则失败结算；`endGame()` 写入最终分数、最高分、收集数和最高 streak，并更新 `localStorage.whisper_pond_best`。
 - 色彩系统：`paletteSets` 保存 4 组 5 色；当前版本固定使用第 1 组，颜色只服务于球体层次和底部目标槽可读性，不参与得分。
 - 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光强度 1.28、半球光强度 0.55，两盏聚光灯提供方向阴影；`centerLight` 在 `(-0.15,-0.25,2.4)` 提供强度 2.35 的中心亮斑，`centerGlow` 使用 CanvasTexture + AdditiveBlending 在球群汇聚区叠加 2.9 world units 暖白光晕。
 - 多语言：`messages` 提供 zh/en 文案；`detectLocale()` 优先读取 `localStorage.game_locale`，再根据浏览器语言判断。
@@ -44,8 +45,7 @@
 - 改挡板结构：修改 6 条挡板循环里的 x、y、angle、BoxGeometry 和 Cannon halfExtents；视觉尺寸和碰撞体深度必须一起调整。
 - 调挡板操作：修改 `RAMP_MIN_ANGLE`、`RAMP_MAX_ANGLE`、`RAMP_DRAG_SENSITIVITY`、`findRampAt()` 的本地坐标阈值和键盘微调角度。
 - 调收集规则：修改 `collectBall()` 的 x 分槽阈值、目标槽得分、非目标得分和 streak 展示规则。
-- 调目标节奏：修改 `TARGET_SWITCH_INTERVAL` 和 `nextTargetSlot()` 的切换顺序。
-- 调局长：修改 `GAME_DURATION`。
+- 调关卡：修改 `LEVELS` 中每关的 `time`、`target`、`goal`、`angles` 和 `movable`。
 - 调物理手感：修改 world gravity、ContactMaterial restitution/friction、球体 damping、`resetBody()` 的初始位置。
 - 调亮度：修改 renderer clear color、scene background、AmbientLight、HemisphereLight、`centerLight`、`centerGlow` 和两盏 SpotLight 强度。
 - 换色盘：修改 `paletteSets`；每组 5 色，前三色会同时作为底部目标槽颜色。

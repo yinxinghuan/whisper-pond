@@ -101,6 +101,30 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.wp-level-badge {
+  position: absolute;
+  left: 50%;
+  top: calc(20px + env(safe-area-inset-top));
+  z-index: 12;
+  min-width: 84px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  transform: translateX(-50%);
+  border: 1px solid rgba(29, 36, 48, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(17, 24, 39, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 26px rgba(255, 255, 255, 0.38);
+}
+
 .wp-screen {
   z-index: 20;
   display: grid;
