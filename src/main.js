@@ -174,7 +174,7 @@ const rampMaterial = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 2
 for (let i = 0; i < 6; i += 1) {
   const x = i % 2 ? -1 : 1;
   const y = (i - 3.5) * 1.5;
-  const angle = (i % 2 ? 1 : -1) * Math.PI / 6;
+  const angle = (i % 2 ? -1 : 1) * Math.PI / 6;
   const ramp = new THREE.Mesh(rampGeometry, rampMaterial.clone());
   ramp.position.set(x, y, 0);
   ramp.rotation.z = angle;

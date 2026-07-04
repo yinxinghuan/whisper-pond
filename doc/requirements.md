@@ -12,7 +12,7 @@
 - 主体为 500 个 instanced 球体，视觉半径和物理基准半径均为 0.1 world units，实例缩放 0.2 到 1.0，材质为 `MeshToonMaterial(vertexColors=true)`。
 - 球体几何写入全白 vertex color，再由 instance color 乘出真实球色；颜色从 4 组 5 色调色盘循环。
 - 物理平面尺寸为 15 × 15 world units，位置 z=-0.1，颜色 `#aaaaaa`，接收阴影。
-- 场景有 6 条交错挡板，视觉尺寸 3 × 0.05 × 0.2 world units，x 在 -1 和 1 间交替，y 为 `(i - 3.5) * 1.5`，z 旋转角为 `±Math.PI / 6`。
+- 场景有 6 条交错挡板，视觉尺寸 3 × 0.05 × 0.2 world units，x 在 -1 和 1 间交替，y 为 `(i - 3.5) * 1.5`；右侧挡板使用 `+Math.PI / 6`，左侧挡板使用 `-Math.PI / 6`，形成向中心收束的漏斗路径。
 - 挡板碰撞体深度为 0.2 world units，对应 Cannon halfExtents z=0.1；球体每帧锁定 z=0，避免从挡板深度方向越过去。
 - 底部显示 3 个颜色收集槽，场景内位置 x=-1.05、0、1.05，y=-5.9，尺寸 0.82 × 0.10 × 0.22 world units；同时底部 HUD 显示 3 条 10px 高的同色短条，宽度不超过 224px，颜色取当前调色盘第 1、2、3 色。
 - 灯光显示清楚阴影：AmbientLight 白色 1.15、HemisphereLight 白色/暖地色 0.45、白色 SpotLight 强度 0.72 位于 `(0,1,2)`、红色 SpotLight 强度 0.58 位于 `(0,-1,2)`，两盏聚光灯都启用 1024 阴影贴图。
@@ -27,7 +27,7 @@
 - 初始创建 500 个 Cannon Sphere body，半径为 `0.1 * scale`，质量为 `scale * 0.01`，linearDamping=0.7，angularDamping=0.7。
 - 每个球初始时 x 为 -1 到 1，y 为 -2.5 到 2.5，z 必须为 0；低于 y=-7 时重置到 x=-1 到 1、y=5 到 7、z=0。
 - 每帧同步 mesh 前，强制 `body.position.z=0`、`body.velocity.z=0`、`body.force.z=0`，形成 2.5D 物理剖面但保留真实 3D 渲染、阴影、相机旋转和透视。
-- 6 条挡板是 mass=0 的 Cannon Box static body，位置和旋转与 Three.js mesh 一致。
+- 6 条挡板是 mass=0 的 Cannon Box static body，位置和旋转与 Three.js mesh 一致；旋转方向必须把球导向中心路径，不能把球向左右外侧冲散。
 - 每个球固定使用 `i % 5` 作为调色盘颜色索引；调色盘切换只改变显示颜色，不改变球的颜色索引。
 - 当球体 y<-7 时先触发收集判定，再重置到顶部；收集槽按 x 坐标划分：x<-0.55 为左槽，-0.55 到 0.55 为中槽，x>0.55 为右槽。
 - 左/中/右槽分别匹配当前调色盘颜色索引 0、1、2；匹配得 3 分并增加 streak，不匹配得 1 分并清空 streak。

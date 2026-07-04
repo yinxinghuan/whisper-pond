@@ -27,7 +27,7 @@
 - 物理世界：`world.gravity` 为 `(0,-9.82,0)`，`SAPBroadphase` 加速碰撞，默认 ContactMaterial 设置 friction=0.08、restitution=0.38。
 - 球体系统：`bodies` 保存 500 个 Cannon Sphere body、scale 和 colorIndex；Three.js 端用一个 `InstancedMesh` 批量渲染 500 个球体，球几何补全白色 vertex color，并用 instance color 控制调色盘。
 - 防漏球约束：每帧在 `syncMeshes()` 中强制 `body.position.z=0`、`body.velocity.z=0`、`body.force.z=0`；挡板碰撞体 z halfExtent 为 0.1；动态 InstancedMesh 关闭 `frustumCulled`，避免主相机只看见阴影。
-- 挡板系统：6 个 Three.js Box mesh 与 6 个 mass=0 Cannon Box body 使用相同位置和 z 旋转，形成交错下落路径。
+- 挡板系统：6 个 Three.js Box mesh 与 6 个 mass=0 Cannon Box body 使用相同位置和 z 旋转；右侧挡板角度为 `+Math.PI / 6`，左侧挡板角度为 `-Math.PI / 6`，形成向中心收束的漏斗路径。
 - 收集槽：`collectionSlots` 创建 3 个底部 Three.js Box mesh，位置为 x=-1.05、0、1.05、y=-5.9；`slotHudItems` 维护底部 3 条 HUD 色槽，`updateColors()` 将两者同步到当前调色盘前三色。
 - 收集与计分：`syncMeshes()` 检测 `body.position.y < -7` 后先调用 `collectBall()`，再 `resetBody(body, i, true)`；`collectBall()` 根据 x 坐标分配收集槽，颜色索引匹配得 3 分，否则得 1 分并清空 streak。
 - 计时与结算：`remaining` 从 60 秒递减；`endGame()` 写入最终分数、最高分、收集数和最高 streak，并更新 `localStorage.whisper_pond_best`。
