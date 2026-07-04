@@ -96,6 +96,9 @@ const messages = {
 };
 
 function detectLocale() {
+  const params = new URLSearchParams(window.location.search);
+  const queryLocale = params.get('lang') || params.get('locale');
+  if (queryLocale === 'en' || queryLocale === 'zh') return queryLocale;
   const override = localStorage.getItem('game_locale');
   if (override === 'en' || override === 'zh') return override;
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
