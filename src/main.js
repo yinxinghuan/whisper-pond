@@ -32,9 +32,12 @@ const messages = {
     score: 'Goal',
     kicker: 'Five plank puzzles',
     title: 'Physics Pond',
-    startCopy: 'Solve five plank layouts by steering enough spheres into the glowing slot.',
+    startCopy: 'Each level names one target slot. Drag only the bright planks and guide enough spheres into it.',
     start: 'Begin',
-    hint: 'Drag bright planks · Fill the goal',
+    hint: 'Only bright planks move · Aim for TARGET',
+    objectiveTitle: '{slot} SLOT',
+    objectiveDetail: 'Need {need} more · {planks} bright planks move',
+    targetMark: 'TARGET',
     complete: 'Pond settled',
     missed: 'Level missed',
     best: 'Best',
@@ -55,9 +58,12 @@ const messages = {
     score: '目标',
     kicker: '五个挡板谜题',
     title: '物理池',
-    startCopy: '解开五个挡板布局，把足够多小球导入发光槽。',
+    startCopy: '每关只有一个目标槽。拖动亮起的挡板，把足够多小球送进去。',
     start: '开始',
-    hint: '拖动亮挡板 · 填满目标',
+    hint: '只有亮挡板能拖 · 对准目标槽',
+    objectiveTitle: '目标：{slot}',
+    objectiveDetail: '还差 {need} 个 · 可拖动 {planks} 条亮挡板',
+    targetMark: '目标',
     complete: '物理结算',
     missed: '关卡未完成',
     best: '最高',
@@ -83,6 +89,12 @@ function detectLocale() {
 
 const locale = detectLocale();
 const t = (key) => messages[locale][key] || messages.en[key] || key;
+document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
+document.body.dataset.locale = locale;
+
+function formatMessage(key, vars = {}) {
+  return Object.entries(vars).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), t(key));
+}
 
 document.querySelectorAll('[data-i18n]').forEach((el) => {
   el.textContent = t(el.dataset.i18n);
@@ -107,8 +119,12 @@ const bestCombo = document.getElementById('bestCombo');
 const finalThought = document.getElementById('finalThought');
 const comboBadge = document.getElementById('comboBadge');
 const levelBadge = document.getElementById('levelBadge');
+const objectiveTitle = document.getElementById('objectiveTitle');
+const objectiveDetail = document.getElementById('objectiveDetail');
 const slotHud = document.getElementById('slotHud');
 const slotHudItems = Array.from(slotHud.querySelectorAll('span'));
+const slotLabels = document.getElementById('slotLabels');
+const slotLabelItems = Array.from(slotLabels.querySelectorAll('span'));
 const hint = document.getElementById('hint');
 
 let phase = 'start';
@@ -370,6 +386,7 @@ function setPhase(nextPhase) {
   endScreen.classList.toggle('is-active', nextPhase === 'end');
   hud.classList.toggle('is-visible', nextPhase === 'playing');
   slotHud.classList.toggle('is-visible', nextPhase === 'playing');
+  slotLabels.classList.toggle('is-visible', nextPhase === 'playing');
 }
 
 function resetBody(body, i, high = false) {
@@ -426,6 +443,7 @@ function findRampAt(point) {
 
 function updateColors() {
   const palette = paletteSets[paletteIndex];
+  const slotNames = [t('targetLeft'), t('targetCenter'), t('targetRight')];
   for (let i = 0; i < COUNT; i += 1) {
     color.set(palette[bodies[i].colorIndex % palette.length]);
     spheres.setColorAt(i, color);
@@ -438,6 +456,8 @@ function updateColors() {
     slotHudItems[i].style.background = palette[i];
     slotHudItems[i].style.boxShadow = isTarget ? `0 0 28px ${palette[i]}` : `0 0 16px ${palette[i]}66`;
     slotHudItems[i].classList.toggle('is-target', isTarget);
+    slotLabelItems[i].textContent = isTarget ? `${slotNames[i]} · ${t('targetMark')}` : slotNames[i];
+    slotLabelItems[i].classList.toggle('is-target', isTarget);
   });
   if (spheres.instanceColor) spheres.instanceColor.needsUpdate = true;
 }
@@ -450,8 +470,21 @@ function currentGoal() {
   return LEVELS[currentLevel].goal;
 }
 
+function remainingNeed() {
+  return Math.max(0, currentGoal() - levelHits);
+}
+
 function updateLevelBadge() {
   levelBadge.textContent = `${t('level')} ${currentLevel + 1}/${LEVELS.length} · ${targetLabel()}`;
+}
+
+function updateObjectivePanel() {
+  const level = LEVELS[currentLevel];
+  objectiveTitle.textContent = formatMessage('objectiveTitle', { slot: targetLabel() });
+  objectiveDetail.textContent = formatMessage('objectiveDetail', {
+    need: remainingNeed(),
+    planks: level.movable.size,
+  });
 }
 
 function showStatus(text) {
@@ -465,6 +498,7 @@ function setTargetSlot(nextTarget, announce = true) {
   targetSlot = ((nextTarget % 3) + 3) % 3;
   updateColors();
   updateLevelBadge();
+  updateObjectivePanel();
   if (announce) {
     showStatus(targetLabel());
     playTarget();
@@ -474,6 +508,7 @@ function setTargetSlot(nextTarget, announce = true) {
 function updateHud() {
   timeLeft.textContent = String(Math.max(0, Math.ceil(remaining)));
   scoreValue.textContent = `${levelHits}/${currentGoal()}`;
+  updateObjectivePanel();
 }
 
 function showCombo(text) {

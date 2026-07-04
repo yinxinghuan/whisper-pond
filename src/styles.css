@@ -12,7 +12,7 @@ body {
   overflow: hidden;
   background: #ece8dd;
   color: #1d2430;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Avenir Next", Nunito, Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
   touch-action: none;
   user-select: none;
@@ -123,6 +123,44 @@ button {
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   box-shadow: 0 8px 26px rgba(255, 255, 255, 0.38);
+}
+
+.wp-objective {
+  position: absolute;
+  left: 50%;
+  top: calc(58px + env(safe-area-inset-top));
+  z-index: 9;
+  width: min(244px, calc(100vw - 112px));
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(29, 36, 48, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.52);
+  color: rgba(17, 24, 39, 0.76);
+  text-align: center;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 12px 36px rgba(92, 76, 52, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.wp-objective strong {
+  font-size: 13px;
+  line-height: 1.1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.wp-objective span {
+  color: rgba(29, 36, 48, 0.58);
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
 }
 
 .wp-screen {
@@ -295,7 +333,7 @@ h2 {
 .wp-combo {
   position: absolute;
   left: 50%;
-  top: calc(94px + env(safe-area-inset-top));
+  top: calc(124px + env(safe-area-inset-top));
   transform: translateX(-50%) translateY(-8px);
   min-width: 48px;
   height: 36px;
@@ -334,6 +372,45 @@ h2 {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
+.wp-slot-labels {
+  position: absolute;
+  left: 50%;
+  bottom: calc(93px + env(safe-area-inset-bottom));
+  z-index: 12;
+  width: min(320px, 82vw);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  transform: translateX(-50%) translateY(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.wp-slot-labels.is-visible {
+  opacity: 0.86;
+  transform: translateX(-50%) translateY(0);
+}
+
+.wp-slot-labels span {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(29, 36, 48, 0.46);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.88);
+}
+
+.wp-slot-labels span.is-target {
+  color: rgba(17, 24, 39, 0.78);
+}
+
 .wp-slots.is-visible {
   opacity: 0.9;
   transform: translateX(-50%) translateY(0);
@@ -365,6 +442,48 @@ h2 {
 @keyframes wp-hint-pulse {
   0%, 100% { opacity: 0.42; }
   50% { opacity: 0.9; }
+}
+
+body[data-locale="zh"] {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Avenir Next", Nunito, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body[data-locale="zh"] .wp-hud span,
+body[data-locale="zh"] .wp-level-badge,
+body[data-locale="zh"] .wp-kicker,
+body[data-locale="zh"] .wp-hint,
+body[data-locale="zh"] .wp-objective strong,
+body[data-locale="zh"] .wp-objective span,
+body[data-locale="zh"] .wp-slot-labels span,
+body[data-locale="zh"] .wp-stats span {
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+body[data-locale="zh"] .wp-hud span {
+  font-size: 12px;
+}
+
+body[data-locale="zh"] .wp-level-badge {
+  min-width: 108px;
+  font-size: 12px;
+}
+
+body[data-locale="zh"] .wp-objective strong {
+  font-size: 14px;
+}
+
+body[data-locale="zh"] .wp-objective span {
+  font-size: 12px;
+}
+
+body[data-locale="zh"] .wp-hint {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+body[data-locale="zh"] .wp-slot-labels span {
+  font-size: 10px;
 }
 
 @media (min-width: 700px) {
