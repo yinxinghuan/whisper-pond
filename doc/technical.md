@@ -15,7 +15,7 @@
 
 - `index.html`：游戏根 DOM、WebGL stage、HUD、关卡徽章、目标说明面板、底部目标槽提示、开始/游戏/结算三态容器、UUID meta、Aigram 水印。
 - `src/main.js`：Three.js 场景、Cannon 物理世界、5 关配置、球体/可拖动挡板/目标槽、目标说明文案、计时计分、排行榜、手机操作、音频和状态切换。
-- `src/styles.css`：明亮舞台、HUD、关卡徽章、目标说明面板、底部三色填充槽、排行榜按钮/弹层、玻璃卡片、combo 徽章、按钮、中文/英文字体排版分支、底部提示和桌面 390px × 680px 容器。
+- `src/styles.css`：明亮舞台、轻量数字 HUD、关卡徽章、目标说明仪表、底部三色接收仓、目标光束、排行榜按钮/弹层、玻璃卡片、combo 徽章、按钮、中文/英文字体排版分支、底部提示和桌面 390px × 680px 容器。
 - `public/aigram-bridge.js`：vanilla Aigram 平台桥，支持 `callAigramAPI()`、`postAigramAPI()` 和 `openAigramProfile()`。
 - `public/img/aigram.svg`：右下角单色平台水印。
 - `doc/requirements.md`：玩法和视觉需求。
@@ -33,13 +33,13 @@
 - 关卡系统：`LEVELS` 定义 5 关的时间、目标槽、目标命中数、6 条挡板初始角度和可移动挡板编号；`applyLevel()` 切换关卡、重置命中数、设置锁定挡板和 HUD。
 - 挡板系统：6 个 Three.js Box mesh 与 6 个 mass=0 Cannon Box body 使用相同位置和 z 旋转；`applyRampAngle()` 将拖动后的角度限制在 -42° 到 +42° 并同步 mesh/body quaternion；锁定挡板透明度为 0.62 且跳过拾取。
 - 挡板拾取：`projectPointerToPlane()` 用 Raycaster 把触点投射到 z=0 平面；`findRampAt()` 把点转换到每条可动挡板本地坐标，选中最近挡板；拖动横向位移乘以 0.42 rad/world unit 后更新角度。
-- 目标槽：`targetSlot` 由当前关卡固定指定；`updateColors()` 同步场景槽透明度、scale、底部槽位颜色和目标高亮；`updateSlotProgress()` 用 `levelHits / currentGoal()` 驱动目标槽内部填充条和 `hits/goal` 数字；`showSlotPop()` 在目标槽命中时创建 0.72s 浮动反馈并触发 0.22s 槽位弹跳；`levelBadge` 显示关卡序号和目标槽，`objectivePanel` 显示目标槽、剩余命中数和可拖动挡板数量。
+- 目标槽：`targetSlot` 由当前关卡固定指定；`updateColors()` 同步场景槽透明度、scale、底部槽位颜色、目标高亮、`slotHud[data-target]` 和目标光束颜色；`updateSlotProgress()` 用 `levelHits / currentGoal()` 驱动目标槽内部纵向液面填充和 `hits/goal` 数字；`showSlotPop()` 在目标槽命中时创建 0.72s 浮动反馈并触发 0.22s 槽位弹跳；`levelBadge` 显示关卡序号和目标槽，`objectivePanel` 显示目标槽、剩余命中数和可拖动挡板数量。
 - 收集与计分：`syncMeshes()` 检测 `body.position.y < -7` 后先调用 `collectBall()`，再 `resetBody(body, i, true)`；`collectBall()` 根据 x 坐标分配收集槽，命中 `targetSlot` 得 5 分、`levelHits + 1` 并增加 streak，否则得 1 分并清空 streak。
 - 计时与结算：每关 `remaining` 使用当前 `LEVELS[n].time`；`levelHits >= goal` 后进入下一关，第 5 关完成则通关；时间归零未达目标则失败结算；`endGame()` 写入最终分数、最高分、收集数和最高 streak，并更新 `localStorage.whisper_pond_best`。
 - 排行榜：`canRank` 来自 `window.Aigram.canRank && window.Aigram.gameUuid`；仅 Aigram 内显示 `leaderboardButton`。`endGame()` 调用 `submitLeaderboardScore(score)` 写入 `/note/aigram/ai/game/rank/score/save`，`showLeaderboard()` 调用 `/note/aigram/ai/game/rank/score/list/by/session_id` 拉榜，并渲染头像、用户名、分数和可点击用户主页。
 - 色彩系统：`paletteSets` 保存 4 组 5 色；当前版本固定使用第 1 组，颜色只服务于球体层次和底部目标槽可读性，不参与得分。
 - 光照与阴影：renderer 开启 `PCFSoftShadowMap`；平面和挡板接收阴影，球体投射/接收阴影；环境光强度 1.28、半球光强度 0.55，两盏聚光灯提供方向阴影；`centerLight` 在 `(-0.15,-0.25,2.4)` 提供强度 1.55、距离 7.2、decay 1.3 的宽中心光，`centerGlow` 使用 CanvasTexture + AdditiveBlending 在球群汇聚区叠加 4.6 world units 暖白光晕，材质 opacity 为 0.5。
-- 多语言与排版：`messages` 提供 zh/en 文案；`detectLocale()` 优先读取 `localStorage.game_locale`，再根据浏览器语言判断；运行时写入 `document.documentElement.lang` 和 `body[data-locale]`，CSS 使用中文分支取消过大的英文字距并切换到 `"PingFang SC"` 等中文字体栈；整体字体改为圆润大字方向，英文优先 `"Arial Rounded MT Bold"` / `Nunito`。
+- 多语言与排版：`messages` 提供 zh/en 文案；`detectLocale()` 优先读取 URL 参数 `?lang=` / `?locale=`，其次读取 `localStorage.game_locale`，再根据浏览器语言判断；运行时写入 `document.documentElement.lang` 和 `body[data-locale]`，CSS 使用中文分支取消过大的英文字距并切换到 `"PingFang SC"` 等中文字体栈；整体字体改为圆润大字方向，英文优先 `"Arial Rounded MT Bold"` / `Nunito`。
 - 音频：`tone()` 封装 OscillatorNode 和 GainNode；开始、换色、匹配收集、不匹配收集和结算都有短音效，音频解锁在用户手势后执行。
 
 ## 4. 扩展点

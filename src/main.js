@@ -581,7 +581,7 @@ function findRampAt(point) {
 function updateSlotProgress() {
   const ratio = Math.min(1, levelHits / Math.max(1, currentGoal()));
   slotFillItems.forEach((fill, i) => {
-    fill.style.transform = `scaleX(${i === targetSlot ? ratio : 0})`;
+    fill.style.transform = `scaleY(${i === targetSlot ? ratio : 0})`;
   });
   slotCountItems.forEach((item, i) => {
     item.textContent = i === targetSlot ? `${levelHits}/${currentGoal()}` : '';
@@ -624,6 +624,8 @@ function updateColors() {
     slotHudItems[i].style.setProperty('--slot-fill', `${palette[i]}cc`);
     slotHudItems[i].style.setProperty('--slot-glow', `${palette[i]}99`);
     slotHudItems[i].classList.toggle('is-target', isTarget);
+    slotHud.dataset.target = String(targetSlot);
+    if (isTarget) slotHud.style.setProperty('--target-beam', `${palette[i]}38`);
     slotNameItems[i].textContent = slotNames[i];
     slotLabelItems[i].textContent = isTarget ? `${slotNames[i]} · ${t('targetMark')}` : slotNames[i];
     slotLabelItems[i].classList.toggle('is-target', isTarget);
