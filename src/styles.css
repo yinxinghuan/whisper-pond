@@ -62,18 +62,29 @@ button {
   z-index: 10;
   left: 50%;
   right: auto;
-  top: calc(12px + env(safe-area-inset-top));
+  top: calc(10px + env(safe-area-inset-top));
   bottom: auto;
-  width: min(344px, calc(100vw - 24px));
-  height: 48px;
-  display: flex;
-  justify-content: space-between;
+  width: min(376px, calc(100vw - 18px));
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 70px;
+  gap: 6px;
   align-items: center;
-  padding: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 239, 188, 0.26), transparent 60%),
+    linear-gradient(180deg, rgba(248, 247, 242, 0.54), rgba(234, 226, 210, 0.3));
+  box-shadow:
+    0 14px 36px rgba(74, 59, 34, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
   pointer-events: none;
   opacity: 0;
   transform: translateX(-50%) translateY(-8px);
   transition: opacity 0.25s ease, transform 0.25s ease;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .wp-hud.is-visible {
@@ -83,23 +94,13 @@ button {
 
 .wp-hud__time,
 .wp-hud__score {
-  width: 92px;
-  height: 48px;
+  min-width: 0;
+  height: 58px;
   display: grid;
   align-content: center;
-  gap: 1px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.44)),
-    rgba(248, 247, 242, 0.38);
-  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.9);
-  box-shadow:
-    0 12px 32px rgba(74, 59, 34, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  gap: 2px;
+  padding: 0 4px;
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.82);
 }
 
 .wp-hud__score {
@@ -107,83 +108,73 @@ button {
 }
 
 .wp-hud span {
-  color: rgba(29, 36, 48, 0.56);
-  font-size: 10px;
+  color: rgba(29, 36, 48, 0.48);
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .wp-hud strong {
   color: #111827;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 900;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .wp-level-badge {
-  position: absolute;
-  left: 50%;
-  top: calc(19px + env(safe-area-inset-top));
-  z-index: 12;
-  min-width: 118px;
-  height: 32px;
+  min-width: 0;
+  height: auto;
   display: grid;
   place-items: center;
-  transform: translateX(-50%);
-  border: 1px solid rgba(29, 36, 48, 0.12);
-  border-radius: 999px;
-  background: rgba(17, 24, 39, 0.82);
-  color: rgba(255, 255, 255, 0.94);
-  font-size: 11px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(29, 36, 48, 0.46);
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   pointer-events: none;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow:
-    0 10px 28px rgba(17, 24, 39, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  text-transform: uppercase;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .wp-objective {
-  position: absolute;
-  left: 50%;
-  top: calc(68px + env(safe-area-inset-top));
-  z-index: 9;
-  width: min(274px, calc(100vw - 72px));
-  min-height: 54px;
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 58px;
   display: grid;
   place-items: center;
-  gap: 4px;
-  transform: translateX(-50%);
+  gap: 2px;
+  transform: none;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 18px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(255, 245, 202, 0.88), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.42));
-  color: rgba(17, 24, 39, 0.76);
+    radial-gradient(circle at 50% 0%, rgba(255, 234, 165, 0.34), transparent 72%),
+    rgba(255, 255, 255, 0.18);
+  color: rgba(17, 24, 39, 0.74);
   text-align: center;
   pointer-events: none;
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  box-shadow:
-    0 16px 42px rgba(92, 76, 52, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
 .wp-objective::before {
   content: "";
   position: absolute;
   left: 50%;
-  top: -40px;
-  width: 108px;
-  height: 66px;
+  top: -34px;
+  width: 84px;
+  height: 54px;
   border-radius: 50%;
-  background: rgba(255, 214, 90, 0.38);
-  filter: blur(18px);
+  background: rgba(255, 214, 90, 0.22);
+  filter: blur(16px);
   transform: translateX(-50%);
 }
 
@@ -192,16 +183,20 @@ button {
   font-size: 16px;
   line-height: 1.1;
   font-weight: 900;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .wp-objective span {
   position: relative;
   color: rgba(29, 36, 48, 0.58);
-  font-size: 12px;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
   font-weight: 850;
   line-height: 1.2;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wp-screen {
@@ -392,7 +387,7 @@ h2 {
 .wp-combo {
   position: absolute;
   left: 50%;
-  top: calc(132px + env(safe-area-inset-top));
+  top: calc(96px + env(safe-area-inset-top));
   transform: translateX(-50%) translateY(-8px);
   min-width: 48px;
   height: 36px;
@@ -418,10 +413,10 @@ h2 {
 .wp-slots {
   position: absolute;
   left: 50%;
-  bottom: calc(60px + env(safe-area-inset-bottom));
+  bottom: calc(54px + env(safe-area-inset-bottom));
   z-index: 12;
-  width: min(336px, calc(100vw - 34px));
-  height: 70px;
+  width: min(334px, calc(100vw - 38px));
+  height: 58px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -434,29 +429,29 @@ h2 {
 .wp-slots::before {
   content: "";
   position: absolute;
-  inset: -13px -10px -11px;
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 28px;
+  inset: -10px -8px -9px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 22px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.22)),
-    rgba(235, 225, 208, 0.28);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.14)),
+    rgba(235, 225, 208, 0.18);
   box-shadow:
-    0 18px 52px rgba(74, 59, 34, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+    0 14px 42px rgba(74, 59, 34, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .wp-slots::after {
   content: "";
   position: absolute;
-  top: -72px;
-  width: 78px;
-  height: 88px;
+  top: -58px;
+  width: 66px;
+  height: 74px;
   border-radius: 50% 50% 18px 18px;
   background: linear-gradient(180deg, var(--target-beam, rgba(239, 68, 68, 0.22)), rgba(255, 255, 255, 0));
-  filter: blur(13px);
-  opacity: 0.82;
+  filter: blur(14px);
+  opacity: 0.58;
   pointer-events: none;
   transform: translateX(-50%);
 }
@@ -515,17 +510,17 @@ h2 {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 5px;
+  gap: 2px;
   overflow: hidden;
   border: 1px solid rgba(29, 36, 48, 0.08);
-  border-radius: 22px;
+  border-radius: 16px;
   background:
-    radial-gradient(circle at 50% 14%, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.14) 56%),
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.1) 60%),
     var(--slot-soft);
   box-shadow:
-    inset 0 -14px 24px var(--slot-soft),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    0 12px 28px rgba(84, 69, 45, 0.12);
+    inset 0 -10px 18px var(--slot-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    0 10px 22px rgba(84, 69, 45, 0.08);
   transform-origin: center;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
   opacity: 0.68;
@@ -535,9 +530,9 @@ h2 {
   content: "";
   position: absolute;
   left: 50%;
-  top: 8px;
-  width: 28px;
-  height: 6px;
+  top: 7px;
+  width: 26px;
+  height: 5px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.12);
   transform: translateX(-50%);
@@ -545,13 +540,13 @@ h2 {
 
 .wp-slots span.is-target {
   opacity: 1;
-  transform: translateY(-8px) scale(1.05);
+  transform: translateY(-6px) scale(1.035);
   border-color: rgba(255, 255, 255, 0.95);
   box-shadow:
-    inset 0 -16px 26px var(--slot-soft),
-    0 0 0 2px rgba(255, 255, 255, 0.7),
-    0 0 34px var(--slot-glow),
-    0 18px 38px rgba(84, 69, 45, 0.2);
+    inset 0 -12px 20px var(--slot-soft),
+    0 0 0 2px rgba(255, 255, 255, 0.56),
+    0 0 26px var(--slot-glow),
+    0 14px 30px rgba(84, 69, 45, 0.14);
 }
 
 .wp-slots span.is-target::before {
@@ -586,16 +581,16 @@ h2 {
 
 .wp-slot-name {
   color: rgba(17, 24, 39, 0.58);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .wp-slot-count {
-  min-height: 20px;
+  min-height: 18px;
   color: #111827;
-  font-size: 18px;
+  font-size: 16px;
   font-style: normal;
   font-weight: 900;
   letter-spacing: 0.02em;
@@ -631,11 +626,11 @@ h2 {
 
 .wp-watermark {
   position: absolute;
-  right: 14px;
-  bottom: calc(14px + env(safe-area-inset-bottom));
-  z-index: 5;
-  width: 26px;
-  opacity: 0.42;
+  right: 16px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 4;
+  width: 22px;
+  opacity: 0.3;
   pointer-events: none;
 }
 
@@ -856,9 +851,9 @@ button.wp-rank-row:active {
 }
 
 @keyframes wp-slot-bump {
-  0% { transform: translateY(-8px) scale(1.05); }
-  45% { transform: translateY(-12px) scale(1.12); }
-  100% { transform: translateY(-8px) scale(1.05); }
+  0% { transform: translateY(-6px) scale(1.035); }
+  45% { transform: translateY(-9px) scale(1.08); }
+  100% { transform: translateY(-6px) scale(1.035); }
 }
 
 @keyframes wp-score-pop {
