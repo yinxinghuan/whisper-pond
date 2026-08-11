@@ -99,7 +99,7 @@ function detectLocale() {
   const params = new URLSearchParams(window.location.search);
   const queryLocale = params.get('lang') || params.get('locale');
   if (queryLocale === 'en' || queryLocale === 'zh') return queryLocale;
-  const override = localStorage.getItem('game_locale');
+  const override = alteruLocalStorage.getItem('game_locale');
   if (override === 'en' || override === 'zh') return override;
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
 }
@@ -756,8 +756,8 @@ function endGame(won = false) {
   gameWon = won;
   setPhase('end');
   playEnd();
-  const best = Math.max(Number(localStorage.getItem(BEST_KEY) || 0), score);
-  localStorage.setItem(BEST_KEY, String(best));
+  const best = Math.max(Number(alteruLocalStorage.getItem(BEST_KEY) || 0), score);
+  alteruLocalStorage.setItem(BEST_KEY, String(best));
   submitLeaderboardScore(score);
   resultLabel.textContent = t(won ? 'complete' : 'missed');
   finalScore.textContent = String(score);
@@ -883,7 +883,7 @@ function onPointerUp(event) {
 
 timeLeft.textContent = String(LEVELS[0].time);
 stoneCount.textContent = '0';
-bestScore.textContent = localStorage.getItem(BEST_KEY) || '0';
+bestScore.textContent = alteruLocalStorage.getItem(BEST_KEY) || '0';
 bestCombo.textContent = '0';
 finalScore.textContent = '0';
 finalThought.textContent = '';
